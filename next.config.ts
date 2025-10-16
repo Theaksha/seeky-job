@@ -1,0 +1,35 @@
+// next.config.ts
+
+import type { NextConfig } from 'next';
+import { ALLOWED_ORIGINS } from './config';
+
+const nextConfig: NextConfig = {
+  //devIndicators: {
+   // buildActivity: false,
+   // buildActivityPosition: 'bottom-right',
+  //},
+   devIndicators: false,
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS[0] : '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
+          },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
