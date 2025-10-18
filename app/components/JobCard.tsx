@@ -1,6 +1,18 @@
-// src/components/JobCard.tsx
-import { Job } from './../lib/parsing';
-import { Building, MapPin } from 'lucide-react';
+// components/JobCard.tsx - UPDATED (without update button)
+'use client';
+
+import React from 'react';
+
+interface Job {
+  jobTitle: string;
+  company: string;
+  location: string;
+  description: string;
+  salary?: string;
+  type?: string;
+  applyUrl?: string;
+  remote?: boolean;
+}
 
 interface JobCardProps {
   job: Job;
@@ -8,19 +20,52 @@ interface JobCardProps {
 
 export function JobCard({ job }: JobCardProps) {
   return (
-    <div className="border border-gray-200 rounded-lg p-4 my-2 bg-white shadow-sm">
-      <h3 className="font-bold text-lg text-gray-800">{job.jobTitle}</h3>
-      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-        <div className="flex items-center gap-1">
-          <Building size={14} />
-          <span>{job.company}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <MapPin size={14} />
-          <span>{job.location}</span>
-        </div>
+    <div className="job-card">
+      <h3>{job.jobTitle || 'No Title'}</h3>
+      <div className="company">
+        <span>{job.company || 'Company not specified'}</span>
       </div>
-      <p className="text-gray-700 mt-2 text-sm">{job.description}</p>
+      <div className="details">
+        <div className="detail-item">
+          <span>📍</span>
+          <span>{job.location || 'Location not specified'}</span>
+        </div>
+        {job.type && (
+          <div className="detail-item">
+            <span>🕒</span>
+            <span>{job.type}</span>
+          </div>
+        )}
+        {job.salary && (
+          <div className="detail-item salary">
+            <span>💰</span>
+            <span>{job.salary}</span>
+          </div>
+        )}
+        {job.remote && (
+          <div className="detail-item">
+            <span>🏠</span>
+            <span>Remote</span>
+          </div>
+        )}
+      </div>
+      {job.description && (
+        <div className="description">
+          {job.description}
+        </div>
+      )}
+      <div className="action-buttons">
+        {job.applyUrl && (
+          <a 
+            href={job.applyUrl} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="apply-btn"
+          >
+            Apply Now
+          </a>
+        )}
+      </div>
     </div>
   );
 }
