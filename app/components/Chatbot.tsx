@@ -1,3 +1,4 @@
+// components/Chatbot.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -13,7 +14,7 @@ export function Chatbot() {
   // Function to send responses to parent window
   const sendResponseToParent = (response: string, userMessage?: string, userProfile?: any) => {
     if (parentOrigin) {
-      console.log('📤 Sending response to parent:', { response, userMessage, userProfile });
+      console.log('📤 Chatbot: Sending response to parent:', { response, userMessage, userProfile });
       
       window.parent.postMessage({
         type: 'CHATBOT_RESPONSE',
