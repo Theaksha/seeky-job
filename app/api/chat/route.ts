@@ -1,4 +1,4 @@
-// src/app/api/chat/route.ts - COMPLETELY UPDATED VERSION
+// src/app/api/chat/route.ts - FIXED VERSION
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from '@aws-sdk/client-bedrock-agent-runtime';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { NextRequest } from 'next/server';
@@ -33,7 +33,7 @@ const lambdaClient = new LambdaClient({
 });
 
 // Function to parse the agent response and ensure consistent format
-function parseAgentResponse(agentMessage: string, sessionId: string) {
+function parseAgentResponse(agentMessage: string, sessionId: string) { // sessionId is now required to be string
   console.log('=== PARSING AGENT RESPONSE ===');
   
   let messageText = '';
@@ -84,7 +84,7 @@ function parseAgentResponse(agentMessage: string, sessionId: string) {
 
   // Convert jobs to consistent structure matching your parsing library
   const structuredJobs = jobs.map((job: any, index: number) => ({
-    jobTitle: job.jobTitle || job.title || `Job ${index + 1}`,
+    jobTitle: job.title || job.jobTitle || `Job ${index + 1}`,
     company: job.company || 'Unknown Company',
     location: job.location || 'Location not specified',
     description: job.description || `Position at ${job.company || 'a company'}`,
@@ -98,7 +98,7 @@ function parseAgentResponse(agentMessage: string, sessionId: string) {
     message: messageText,
     jobs: structuredJobs, // Use the structured jobs
     filters: filters,
-    sessionId: sessionId,
+    sessionId: sessionId, // sessionId is guaranteed to be string
     timestamp: new Date().toISOString()
   };
 }
@@ -117,16 +117,16 @@ function generateFiltersFromJobs(messageText: string) {
     workAuthorization: true
   };
 
-  // Extract job titles from the new format
-  const titleMatches = messageText.matchAll(/(.+?)\s+at\s+(.+?)(?:\n|$)/g);
+  // Extract job titles from the message
+  const titleMatches = messageText.matchAll(/\d+\.\s+\*\*(.*?)\*\*/g);
   for (const match of titleMatches) {
-    if (match[1] && !filters.jobTitle.includes(match[1].trim())) {
-      filters.jobTitle.push(match[1].trim());
+    if (match[1] && !filters.jobTitle.includes(match[1])) {
+      filters.jobTitle.push(match[1]);
     }
   }
 
   // Extract locations from the message
-  const locationMatches = messageText.matchAll(/Location:\s*([^\n]+)/gi);
+  const locationMatches = messageText.matchAll(/(?:in|at|Location:)\s+([^\.\n]+)(?:\.|$)/gi);
   for (const match of locationMatches) {
     const location = match[1].trim();
     if (location && location.length > 2 && !filters.location.cities.includes(location)) {
@@ -138,133 +138,15 @@ function generateFiltersFromJobs(messageText: string) {
   return filters;
 }
 
-// NEW: Function to parse the format your AI agent is actually returning
-function parseNewJobFormatFromText(text: string) {
-  const jobs = [];
-  
-  // Split the text into job blocks - look for patterns like "Job Title at Company"
-  const jobBlocks = text.split(/(?=\b[A-Z][a-zA-Z\s]+\([A-Z]+\) at |\b[A-Z][a-zA-Z\s]+ at )/);
-  
-  console.log(`🔄 Found ${jobBlocks.length} potential job blocks`);
-  
-  for (const block of jobBlocks) {
-    if (block.trim() && !block.trim().toLowerCase().includes('if you need more information')) {
-      const job = parseSingleJobBlock(block.trim());
-      if (job) {
-        jobs.push(job);
-      }
-    }
-  }
-  
-  return jobs;
-}
-
-// NEW: Parse a single job block in the format:
-// "Applied AI Researcher (USA) at Articul8 AI"
-// "Location: United States"
-// "Job Description: Implement novel algorithms..."
-function parseSingleJobBlock(block: string) {
-  console.log('🔄 Parsing job block:', block.substring(0, 100));
-  
-  const lines = block.split('\n').map(line => line.trim()).filter(line => line);
-  
-  if (lines.length < 2) {
-    console.log('❌ Block too short, skipping');
-    return null;
-  }
-
-  // Parse first line: "Applied AI Researcher (USA) at Articul8 AI"
-  const firstLine = lines[0];
-  const titleCompanyMatch = firstLine.match(/^(.+?)\s+at\s+(.+)$/);
-  
-  if (!titleCompanyMatch) {
-    console.log('❌ No title/company match in first line:', firstLine);
-    return null;
-  }
-
-  const jobTitle = titleCompanyMatch[1].trim();
-  const company = titleCompanyMatch[2].trim();
-
-  const job: any = {
-    jobTitle: jobTitle,
-    company: company,
-    location: 'Location not specified',
-    description: `Position: ${jobTitle} at ${company}`,
-    salary: undefined,
-    type: undefined,
-    remote: false
-  };
-
-  // Parse remaining lines
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Location
-    if (line.toLowerCase().startsWith('location:')) {
-      job.location = line.replace(/^location:\s*/i, '').trim();
-      console.log('📍 Found location:', job.location);
-    }
-    // Salary
-    else if (line.toLowerCase().startsWith('salary:') || line.toLowerCase().startsWith('compensation:')) {
-      job.salary = line.replace(/^(salary|compensation):\s*/i, '').trim();
-      console.log('💰 Found salary:', job.salary);
-    }
-    // Job Description
-    else if (line.toLowerCase().startsWith('job description:')) {
-      job.description = line.replace(/^job description:\s*/i, '').trim();
-      console.log('📝 Found description');
-    }
-    // Source (ignore)
-    else if (line.toLowerCase().startsWith('source:')) {
-      // Skip source line
-      continue;
-    }
-    // If line contains salary information but doesn't start with label
-    else if (line.includes('$') && (line.includes('/yr') || line.includes('yr') || line.includes('k'))) {
-      job.salary = line.trim();
-      console.log('💰 Found salary in content:', job.salary);
-    }
-    // If line doesn't start with a label and is not source, it might be continuation of description
-    else if (!line.match(/^(location|salary|compensation|job description|source):/i)) {
-      // Only add to description if it's meaningful content (not too short and not source-like)
-      if (line.length > 10 && !line.toLowerCase().includes('source:')) {
-        if (job.description === `Position: ${jobTitle} at ${company}`) {
-          job.description = line;
-        } else if (job.description.length < 300) {
-          job.description += ' ' + line;
-        }
-      }
-    }
-  }
-
-  // Check for remote work in location or description
-  if (job.location.toLowerCase().includes('remote') || job.description.toLowerCase().includes('remote')) {
-    job.remote = true;
-  }
-
-  console.log('✅ Successfully parsed job:', { 
-    jobTitle: job.jobTitle,
-    company: job.company,
-    location: job.location
-  });
-
-  return job;
-}
-
-// UPDATED: Enhanced job extraction function that tries multiple formats
+// Enhanced job extraction function
 function extractJobsFromMessage(message: string) {
-  console.log('🔍 extractJobsFromMessage called');
-  
   let jobs = [];
   
-  // First try the new format that matches your AI agent's output
+  // Try the new format first
   jobs = parseNewJobFormatFromText(message);
-  console.log(`🔄 New format parsing found ${jobs.length} jobs`);
   
-  // If no jobs found in new format, try the original numbered list formats
+  // If no jobs found in new format, try the original formats
   if (jobs.length === 0) {
-    console.log('🔄 Trying numbered list formats...');
-    
     // Method 1: Standard format with numbered list and bold titles
     const standardRegex = /(\d+)\.\s+\*\*(.*?)\*\*\s+(?:at|in)\s+(.*?)\s+(?:in|at)\s+([^\.]+)\.([\s\S]*?)(?=\d+\.\s+\*\*|$)/g;
     
@@ -292,11 +174,64 @@ function extractJobsFromMessage(message: string) {
     }
   }
 
-  console.log(`🎯 Total jobs extracted: ${jobs.length}`);
   return jobs;
 }
 
-// Parse job details from standard format (keep for backward compatibility)
+// Add this function to parse the new job format
+function parseNewJobFormatFromText(text: string) {
+  const jobs = [];
+  
+  // Split by double newlines to get job blocks
+  const jobBlocks = text.split(/\n\s*\n/).filter(block => block.trim());
+  
+  for (const block of jobBlocks) {
+    const lines = block.split('\n').map(line => line.trim()).filter(line => line);
+    
+    if (lines.length >= 2) {
+      // First line: "Applied AI Researcher (USA) at Articul8 AI"
+      const firstLine = lines[0];
+      const titleCompanyMatch = firstLine.match(/^(.+?)\s+at\s+(.+)$/);
+      
+      if (titleCompanyMatch) {
+        const job: any = {
+          jobTitle: titleCompanyMatch[1].trim(),
+          company: titleCompanyMatch[2].trim(),
+          location: 'Location not specified',
+          description: ''
+        };
+        
+        // Parse remaining lines
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          
+          if (line.toLowerCase().startsWith('location:')) {
+            job.location = line.replace(/^location:\s*/i, '').trim();
+          } else if (line.toLowerCase().startsWith('salary:') || line.toLowerCase().includes('$')) {
+            job.salary = line.replace(/^(salary|compensation):\s*/i, '').trim();
+          } else if (line.toLowerCase().startsWith('job description:')) {
+            job.description = line.replace(/^job description:\s*/i, '').trim();
+          } else if (!line.toLowerCase().startsWith('source:')) {
+            // If it's not a labeled line and not source, add to description
+            if (job.description.length < 200) {
+              job.description += (job.description ? ' ' : '') + line;
+            }
+          }
+        }
+        
+        // If no description was found, use a default
+        if (!job.description) {
+          job.description = `${job.jobTitle} position at ${job.company}`;
+        }
+        
+        jobs.push(job);
+      }
+    }
+  }
+  
+  return jobs;
+}
+
+// Parse job details from standard format
 function parseJobDetails(title: string, company: string, location: string, details: string) {
   const job: any = {
     title: title.trim(),
@@ -345,7 +280,7 @@ function parseJobDetails(title: string, company: string, location: string, detai
   return job;
 }
 
-// Parse job details from advanced/fallback format (keep for backward compatibility)
+// Parse job details from advanced/fallback format
 function parseJobDetailsAdvanced(title: string, details: string) {
   const job: any = {
     title: title.trim(),
@@ -395,14 +330,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { message, userId, guestSessionId } = body;
-    let sessionId: string | undefined;
-
-    if (userId) {
+    
+    // Ensure sessionId is always a string
+    let sessionId: string;
+    
+    if (userId && typeof userId === 'string') {
       sessionId = userId;
-    } else if (guestSessionId) {
+    } else if (guestSessionId && typeof guestSessionId === 'string') {
       sessionId = guestSessionId;
     } else {
       sessionId = `guest-${Date.now()}`;
+    }
+
+    // Additional validation to ensure sessionId is never undefined
+    if (!sessionId) {
+      sessionId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
 
     if (!message || typeof message !== 'string' || message.trim() === '') {
@@ -453,22 +395,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Extract the actual message content
-    const agentMessage = agentResponse.message || agentResponse.response || apiGatewayResponse.body;
+    const agentMessage = agentResponse.message || agentResponse.response || apiGatewayResponse.body || '';
 
-    console.log('📥 Raw agent message:', agentMessage.substring(0, 500) + '...');
-
-    // Parse the agent response in any format
+    // Parse the agent response in any format - sessionId is now guaranteed to be string
     const parsedData = parseAgentResponse(agentMessage, sessionId);
 
     console.log('✅ Final parsed data ready');
     console.log('📊 Jobs found:', parsedData.jobs.length);
     console.log('⚙️ Filters:', Object.keys(parsedData.filters).length > 0 ? 'Present' : 'Generated');
-    
-    if (parsedData.jobs.length > 0) {
-      console.log('🎯 Sample job structure:', parsedData.jobs[0]);
-    } else {
-      console.log('❌ No jobs were parsed from the response');
-    }
+    console.log('🎯 Sample job structure:', parsedData.jobs.length > 0 ? parsedData.jobs[0] : 'No jobs');
 
     return new Response(JSON.stringify(parsedData), { 
       status: 200,
