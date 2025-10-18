@@ -1,16 +1,15 @@
-// components/ChatWindow.tsx - UPDATED
+// components/ChatWindow.tsx - FIXED VERSION
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Filter } from 'lucide-react';
 import Image from 'next/image';
 import { v4 as uuidv4 } from 'uuid';
-import { parseContent, Job } from '../lib/parsing';
+import { parseContent, Job, ParsedContent } from '../lib/parsing';
 import { JobCard } from './JobCard';
 import { InstructionList } from './InstructionList';
 
 // Define the type for a message
-type ParsedContent = ReturnType<typeof parseContent>;
 type MultiPartContent = { type: 'multi-part'; data: ParsedContent[] };
 
 type Message = {
@@ -52,7 +51,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
 
   // Function to handle filter updates for all jobs
   const handleUpdateAllFilters = () => {
-    console.log('🔄 ChatWindow: Update all filters clicked');
+    console.log('ChatWindow: Update all filters clicked');
     
     if (currentJobs.length === 0) {
       console.warn('No jobs available to create filters from');
@@ -61,7 +60,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
 
     // Create comprehensive filters based on all current jobs
     const filters = createFiltersFromJobs(currentJobs);
-    console.log('🎯 Sending filters to parent:', filters);
+    console.log('Sending filters to parent:', filters);
     
     // Send filter update to parent window
     if (onSendResponse) {
@@ -230,7 +229,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
         userId: requestUserId,
       };
 
-      console.log('📤 Sending request to API...');
+      console.log('Sending request to API...');
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: headers,
@@ -243,13 +242,13 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
 
       // Parse the JSON response
       const responseData = await response.json();
-      console.log('✅ API Response received:', responseData);
+      console.log('API Response received:', responseData);
 
       let parsedContent: ParsedContent;
 
       // Check if we have jobs in the response
       if (responseData.jobs && responseData.jobs.length > 0) {
-        console.log('🎯 Jobs found in response:', responseData.jobs.length);
+        console.log('Jobs found in response:', responseData.jobs.length);
         
         // Store current jobs for filter creation
         setCurrentJobs(responseData.jobs);
@@ -275,16 +274,16 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
         setCurrentJobs([]);
         
         if (responseData.message) {
-          console.log('📝 Using message content for parsing');
+          console.log('Using message content for parsing');
           // Use the parseContent function for text content
           parsedContent = parseContent(responseData.message);
         } else {
-          console.log('⚠️ No jobs or message found, using raw response');
+          console.log('No jobs or message found, using raw response');
           parsedContent = parseContent(JSON.stringify(responseData));
         }
       }
 
-      console.log('🔄 Final parsed content:', parsedContent);
+      console.log('Final parsed content:', parsedContent);
 
       // Update the message with parsed content
       setMessages(prev => prev.map(msg => 
@@ -327,63 +326,90 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
     }
   };
 
-  const RenderMessageContent = ({ content }: { content: Message['content'] }) => {
-    if (typeof content === 'string') {
-      return <p className="whitespace-pre-wrap">{content}</p>;
-    }
+  // Fixed RenderMessageContent component with proper type handling
+ const RenderMessageContent = ({ content }: { content: Message['content'] }) => {
+  // Handle string content
+  if (typeof content === 'string') {
+    return <p className="whitespace-pre-wrap">{content}</p>;
+  }
 
-    const renderAssistantMessage = (assistantContent: Message['content']) => {
-      if (typeof assistantContent === 'string') {
-        return <p className="whitespace-pre-wrap">{assistantContent}</p>;
-      }
-
-      switch (assistantContent.type) {
-        case 'jobs':
-          console.log('🎯 Rendering jobs:', assistantContent.data);
-          return (
-            <div className="jobs-container">
-              <div className="space-y-3">
-                {assistantContent.data.map((job: Job, i: number) => (
-                  <JobCard key={i} job={job} />
-                ))}
-              </div>
-              
-              {/* Global Update Filters Button - Only show when there are jobs */}
-              {assistantContent.data.length > 0 && (
-                <div className="global-filters-button-container">
-                  <button 
-                    className="global-update-filters-btn"
-                    onClick={handleUpdateAllFilters}
-                    title="Apply search criteria from all these jobs to your dashboard filters"
-                  >
-                    <Filter size={16} />
-                    Update Dashboard Filters ({assistantContent.data.length} jobs)
-                  </button>
-                  <div className="filter-help-text">
-                    This will update your main search with criteria from all the jobs above
-                  </div>
+  // Handle ParsedContent objects
+  if (isParsedContent(content)) {
+    switch (content.type) {
+      case 'jobs':
+        console.log('Rendering jobs:', content.data);
+        return (
+          <div className="jobs-container">
+            <div className="space-y-3">
+              {content.data.map((job: Job, i: number) => (
+                <JobCard key={i} job={job} />
+              ))}
+            </div>
+            
+            {/* Global Update Filters Button - Only show when there are jobs */}
+            {content.data.length > 0 && (
+              <div className="global-filters-button-container">
+                <button 
+                  className="global-update-filters-btn"
+                  onClick={handleUpdateAllFilters}
+                  title="Apply search criteria from all these jobs to your dashboard filters"
+                >
+                  <Filter size={16} />
+                  Update Dashboard Filters ({content.data.length} jobs)
+                </button>
+                <div className="filter-help-text">
+                  This will update your main search with criteria from all the jobs above
                 </div>
-              )}
-            </div>
-          );
-        case 'list':
-          return (
-            <div className="instruction-list">
-              <ol className="space-y-2">
-                {assistantContent.data.map((item: any, i: number) => (
-                  <li key={i} className="text-gray-700">{item.text}</li>
-                ))}
-              </ol>
-            </div>
-          );
-        case 'text':
-        default:
-          return <p className="whitespace-pre-wrap">{assistantContent.data}</p>;
-      }
-    };
-    
-    return renderAssistantMessage(content);
-  };
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'list':
+        return (
+          <div className="instruction-list">
+            <ol className="space-y-2">
+              {content.data.map((item: any, i: number) => (
+                <li key={i} className="text-gray-700">{item.text}</li>
+              ))}
+            </ol>
+          </div>
+        );
+      
+      case 'text':
+        return <p className="whitespace-pre-wrap">{content.data}</p>;
+      
+      default:
+        // Fallback for any unexpected content type
+        return <p className="whitespace-pre-wrap">Unknown content type</p>;
+    }
+  }
+
+  // Handle MultiPartContent
+  if (isMultiPartContent(content)) {
+    return (
+      <div className="multi-part-content">
+        {content.data.map((part: ParsedContent, index: number) => (
+          <div key={index}>
+            <RenderMessageContent content={part} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Fallback for any unexpected content structure
+  return <p className="whitespace-pre-wrap">Unable to display content</p>;
+};
+
+// Type guard functions
+function isParsedContent(content: any): content is ParsedContent {
+  return content && typeof content === 'object' && 'type' in content && 'data' in content;
+}
+
+function isMultiPartContent(content: any): content is MultiPartContent {
+  return content && typeof content === 'object' && 'type' in content && content.type === 'multi-part' && Array.isArray(content.data);
+}
 
   return (
     <div className="flex flex-col h-full bg-white">
