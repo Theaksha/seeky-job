@@ -1,4 +1,4 @@
-// src/app/api/chat/route.ts - FIXED VERSION
+// src/app/api/chat/route.ts - COMPLETE FIXED VERSION
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from '@aws-sdk/client-bedrock-agent-runtime';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { NextRequest } from 'next/server';
@@ -32,8 +32,13 @@ const lambdaClient = new LambdaClient({
   region: 'us-east-2',
 });
 
+// CORS allowed origins
+const allowedOrigins = process.env.NEXT_PUBLIC_ALLOWED_ORIGINS 
+  ? process.env.NEXT_PUBLIC_ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:3000'];
+
 // Function to parse the agent response and ensure consistent format
-function parseAgentResponse(agentMessage: string, sessionId: string) { // sessionId is now required to be string
+function parseAgentResponse(agentMessage: string, sessionId: string) {
   console.log('=== PARSING AGENT RESPONSE ===');
   
   let messageText = '';
@@ -49,12 +54,12 @@ function parseAgentResponse(agentMessage: string, sessionId: string) { // sessio
     const responseMatch = agentMessage.match(/<response>([\s\S]*?)<\/response>/);
     if (responseMatch) {
       messageText = responseMatch[1].trim();
-      console.log('✓ Extracted content from <response> tags');
+      console.log('Extracted content from <response> tags');
     }
   } else {
     // Use entire message as response text
     messageText = agentMessage;
-    console.log('ℹ No <response> tags found, using entire message');
+    console.log('No <response> tags found, using entire message');
   }
 
   if (hasDashboardTags) {
@@ -65,13 +70,13 @@ function parseAgentResponse(agentMessage: string, sessionId: string) { // sessio
         const dashboardContent = dashboardMatch[1].trim();
         const filtersData = JSON.parse(dashboardContent);
         filters = filtersData.filters || filtersData;
-        console.log('✓ Extracted filters from <update_dashboard> tags:', filters);
+        console.log('Extracted filters from <update_dashboard> tags:', filters);
       } catch (parseError) {
-        console.error('✗ Error parsing dashboard filters:', parseError);
+        console.error('Error parsing dashboard filters:', parseError);
       }
     }
   } else {
-    console.log('ℹ No <update_dashboard> tags found, generating default filters');
+    console.log('No <update_dashboard> tags found, generating default filters');
     // Generate filters based on job content
     filters = generateFiltersFromJobs(messageText);
   }
@@ -79,7 +84,7 @@ function parseAgentResponse(agentMessage: string, sessionId: string) { // sessio
   // Extract job listings from the message text
   if (messageText) {
     jobs = extractJobsFromMessage(messageText);
-    console.log(`✓ Extracted ${jobs.length} jobs from message`);
+    console.log(`Extracted ${jobs.length} jobs from message`);
   }
 
   // Convert jobs to consistent structure matching your parsing library
@@ -96,9 +101,9 @@ function parseAgentResponse(agentMessage: string, sessionId: string) { // sessio
 
   return {
     message: messageText,
-    jobs: structuredJobs, // Use the structured jobs
+    jobs: structuredJobs,
     filters: filters,
-    sessionId: sessionId, // sessionId is guaranteed to be string
+    sessionId: sessionId,
     timestamp: new Date().toISOString()
   };
 }
@@ -134,7 +139,7 @@ function generateFiltersFromJobs(messageText: string) {
     }
   }
 
-  console.log('✓ Generated filters from job content:', filters);
+  console.log('Generated filters from job content:', filters);
   return filters;
 }
 
@@ -177,7 +182,7 @@ function extractJobsFromMessage(message: string) {
   return jobs;
 }
 
-// Add this function to parse the new job format
+// Function to parse the new job format
 function parseNewJobFormatFromText(text: string) {
   const jobs = [];
   
@@ -354,10 +359,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Get the request origin for CORS
+    const requestOrigin = req.headers.get('origin') || '';
+    const isAllowedOrigin = allowedOrigins.includes(requestOrigin);
+    
     // Add CORS headers
     const headers = {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': 'http://localhost:3000',
+      'Access-Control-Allow-Origin': isAllowedOrigin ? requestOrigin : 'http://localhost:3000',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
@@ -367,7 +376,7 @@ export async function POST(req: NextRequest) {
       return new Response(null, { headers });
     }
 
-    console.log('🚀 Using Lambda proxy for Bedrock agent call');
+    console.log('Using Lambda proxy for Bedrock agent call');
 
     const invokeParams = {
       FunctionName: 'arn:aws:lambda:us-east-2:927701869872:function:seeky-bedrockagentfunc',
@@ -400,10 +409,10 @@ export async function POST(req: NextRequest) {
     // Parse the agent response in any format - sessionId is now guaranteed to be string
     const parsedData = parseAgentResponse(agentMessage, sessionId);
 
-    console.log('✅ Final parsed data ready');
-    console.log('📊 Jobs found:', parsedData.jobs.length);
-    console.log('⚙️ Filters:', Object.keys(parsedData.filters).length > 0 ? 'Present' : 'Generated');
-    console.log('🎯 Sample job structure:', parsedData.jobs.length > 0 ? parsedData.jobs[0] : 'No jobs');
+    console.log('Final parsed data ready');
+    console.log('Jobs found:', parsedData.jobs.length);
+    console.log('Filters:', Object.keys(parsedData.filters).length > 0 ? 'Present' : 'Generated');
+    console.log('Sample job structure:', parsedData.jobs.length > 0 ? parsedData.jobs[0] : 'No jobs');
 
     return new Response(JSON.stringify(parsedData), { 
       status: 200,
@@ -411,15 +420,19 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ API Error:', error);
+    console.error('API Error:', error);
     let errorMessage = 'An unknown error occurred.';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
 
+    // Get the request origin for CORS
+    const requestOrigin = req.headers.get('origin') || '';
+    const isAllowedOrigin = allowedOrigins.includes(requestOrigin);
+    
     const headers = {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': 'http://localhost:3000',
+      'Access-Control-Allow-Origin': isAllowedOrigin ? requestOrigin : 'http://localhost:3000',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
