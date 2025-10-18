@@ -1,4 +1,4 @@
-/* src/components/Chatbot.css - FINAL VERSION */
+/* src/components/Chatbot.css - COMPLETE UPDATED VERSION */
 
 /* 1. Make the iframe's own page transparent. This is correct. */
 html,
@@ -71,9 +71,9 @@ body.chatbot-open .chatbot-toggler .icon-close {
     position: fixed;
     right: 0px;
     bottom: 0px;
-    top : 0px;
+    top: 0px;
     width: 450px;
-    max-width: calc(100% );
+    max-width: calc(100%);
     background: #fff;
     border-radius: 15px;
     box-shadow: 0 0 128px 0 rgba(0, 0, 0, 0.1),
@@ -104,26 +104,27 @@ body.chatbot-open .chatbot-window {
     /* Immediate visibility */
 }
 
-/* ... all other styles for header, chatbox, input, etc., can remain exactly the same ... */
+/* Chatbot Header */
 .chatbot-header {
-    padding: 8px;
+    padding: 16px;
     display: flex;
-    
     align-items: center;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 15px 15px 0 0;
 }
 
 .chatbot-header img {
-    height: 60px;
-    width: 60px;
-    margin-right: 8px;
+    height: 40px;
+    width: 40px;
+    margin-right: 12px;
 }
 
 .chatbot-header .header-text h2 {
     font-size: 1.25rem;
     font-weight: bold;
     color: #1749B6;
-    line-height: 1;
+    line-height: 1.2;
     margin: 0;
 }
 
@@ -133,16 +134,19 @@ body.chatbot-open .chatbot-window {
     margin: 0;
 }
 
+/* Chatbox - FIXED HEIGHT */
 .chatbox {
     overflow-y: auto;
-    height: 400px;
-    padding: 24px;
+    height: calc(100vh - 200px); /* Dynamic height */
+    max-height: 600px;
+    padding: 20px;
     background: #f7f7f7;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
 }
 
+/* Chat Messages */
 .chat {
     display: flex;
     align-items: flex-start;
@@ -156,17 +160,20 @@ body.chatbot-open .chatbot-window {
 .chat.outgoing .message-bubble {
     background: #CCE7FF;
     color: #1749B6;
-    border-radius: 12px 12px 0 12px;
-    padding: 12px;
+    border-radius: 18px 18px 4px 18px;
+    padding: 12px 16px;
     max-width: 75%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .chat.incoming .message-bubble {
-    background: #E4E8EB;
+    background: #fff;
     color: #333;
-    border-radius: 12px 12px 12px 0;
-    padding: 12px;
-    max-width: 75%;
+    border-radius: 18px 18px 18px 4px;
+    padding: 12px 16px;
+    max-width: 85%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
 }
 
 .chat p {
@@ -177,30 +184,240 @@ body.chatbot-open .chatbot-window {
     margin: 0;
 }
 
+/* Jobs Container */
+.jobs-container {
+    position: relative;
+    width: 100%;
+}
+
+/* Job Cards Styling */
+.job-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 8px 0;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.2s ease;
+}
+
+.job-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.job-card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 4px 0;
+    line-height: 1.3;
+}
+
+.job-card .company {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #6b7280;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.job-card .details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.job-card .detail-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.job-card .salary {
+    color: #059669;
+    font-weight: 500;
+}
+
+.job-card .description {
+    color: #4b5563;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+/* Action Buttons Container */
+.job-card .action-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    align-items: center;
+}
+
+.job-card .apply-btn {
+    background: #1749B6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.job-card .apply-btn:hover {
+    background: #133a8f;
+    text-decoration: none;
+    color: white;
+}
+
+/* Global Update Filters Button */
+.global-filters-button-container {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 16px;
+    margin-left: -8px;
+    margin-right: -8px;
+}
+
+.global-update-filters-btn {
+    background: #059669;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.global-update-filters-btn:hover {
+    background: #047857;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.global-update-filters-btn:active {
+    transform: translateY(0);
+}
+
+.global-update-filters-btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.filter-help-text {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 6px;
+    font-style: italic;
+}
+
+/* Instruction List Styling */
+.instruction-list {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 8px 0;
+}
+
+.instruction-list ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.instruction-list li {
+    margin-bottom: 8px;
+    color: #4a5568;
+    line-height: 1.5;
+}
+
+.instruction-list li:last-child {
+    margin-bottom: 0;
+}
+
+/* Loading Animation */
+.loading-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 16px 0;
+}
+
+.loading-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9ca3af;
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Chat Input */
 .chat-input {
     display: flex;
-    gap: 5px;
+    gap: 8px;
     padding: 16px;
     background: #fff;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #e5e7eb;
     position: relative;
+    border-radius: 0 0 15px 15px;
 }
 
 .chat-input textarea {
     width: 100%;
     min-height: 55px;
-    padding: 16px 50px 16px 15px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    max-height: 120px;
+    padding: 12px 50px 12px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
     font-size: 0.95rem;
     resize: none;
     outline: none;
-    transition: border-color 0.2s;
+    transition: all 0.2s;
     font-family: inherit;
+    background: #f9fafb;
 }
 
 .chat-input textarea:focus {
     border-color: #1749B6;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(23, 73, 182, 0.1);
 }
 
 .chat-input .send-btn {
@@ -211,14 +428,191 @@ body.chatbot-open .chatbot-window {
     background: none;
     border: none;
     cursor: pointer;
-    color: #666;
+    color: #6b7280;
+    padding: 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
 }
 
 .chat-input .send-btn:hover:not(:disabled) {
     color: #1749B6;
+    background: #f3f4f6;
 }
 
 .chat-input .send-btn:disabled {
     cursor: not-allowed;
-    color: #ccc;
+    color: #d1d5db;
+}
+
+/* Debug Button */
+.debug-btn {
+    margin-left: auto;
+    background: #6b7280;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.debug-btn:hover {
+    background: #4b5563;
+}
+
+/* Raw Response Button */
+.raw-response-btn {
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 8px;
+}
+
+.raw-response-btn:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+/* Success Message Styling */
+.success-message {
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+}
+
+/* Error Message Styling */
+.error-message {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+}
+
+/* No Jobs Message */
+.no-jobs-message {
+    text-align: center;
+    padding: 20px;
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .chatbot-window {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+        right: 0;
+        bottom: 0;
+        top: 0;
+    }
+    
+    .chatbox {
+        height: calc(100vh - 180px);
+        max-height: none;
+    }
+    
+    .chat.outgoing .message-bubble {
+        max-width: 85%;
+    }
+    
+    .chat.incoming .message-bubble {
+        max-width: 90%;
+    }
+    
+    .job-card {
+        padding: 12px;
+    }
+    
+    .global-filters-button-container {
+        margin-left: 0;
+        margin-right: 0;
+        padding: 12px;
+    }
+    
+    .global-update-filters-btn {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+    }
+}
+
+/* Scrollbar Styling */
+.chatbox::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chatbox::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.chatbox::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.chatbox::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Animation for new messages */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.chat {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Focus states for accessibility */
+.chatbot-toggler:focus {
+    outline: 2px solid #1749B6;
+    outline-offset: 2px;
+}
+
+.global-update-filters-btn:focus {
+    outline: 2px solid #059669;
+    outline-offset: 2px;
+}
+
+.job-card .apply-btn:focus {
+    outline: 2px solid #1749B6;
+    outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+    .chatbot-toggler,
+    .chat-input {
+        display: none !important;
+    }
+    
+    .chatbot-window {
+        position: static;
+        transform: none;
+        opacity: 1;
+        visibility: visible;
+        box-shadow: none;
+        width: 100%;
+    }
 }
