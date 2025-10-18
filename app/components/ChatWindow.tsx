@@ -65,6 +65,8 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
     // Send filter update to parent window
     if (onSendResponse) {
       onSendResponse('filter_update', undefined, { filters });
+    } else {
+      console.error('onSendResponse is not defined!');
     }
   };
 
