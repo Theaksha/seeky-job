@@ -1,4 +1,4 @@
-// components/ChatWindow.tsx - FIXED VERSION
+// components/ChatWindow.tsx - FIXED VERSION WITH AGENT'S FILTERS
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -16,6 +16,8 @@ type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string | ParsedContent | MultiPartContent;
+  // Add filters to store agent's filter data
+  filters?: any;
 };
 
 // Define the type for the component's props
@@ -37,6 +39,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentJobs, setCurrentJobs] = useState<Job[]>([]);
+  const [agentFilters, setAgentFilters] = useState<any>(null); // Store agent's filters
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,157 +52,36 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
   };
   useEffect(scrollToBottom, [messages]);
 
-  // Function to handle filter updates for all jobs
+  // Function to handle filter updates using AGENT'S FILTERS
   const handleUpdateAllFilters = () => {
-    console.log('ChatWindow: Update all filters clicked');
+    console.log('🔧 ChatWindow: Update all filters clicked');
+    console.log('🎯 Agent filters available:', !!agentFilters);
     
-    if (currentJobs.length === 0) {
-      console.warn('No jobs available to create filters from');
-      return;
-    }
-
-    // Create comprehensive filters based on all current jobs
-    const filters = createFiltersFromJobs(currentJobs);
-    console.log('Sending filters to parent:', filters);
-    
-    // Send filter update to parent window
-    if (onSendResponse) {
-      onSendResponse('filter_update', undefined, { filters });
-    } else {
-      console.error('onSendResponse is not defined!');
-    }
-  };
-
-  // Helper function to create filters from multiple jobs
-  const createFiltersFromJobs = (jobs: Job[]): any => {
-    const allTitles = jobs.map(job => job.jobTitle).filter(Boolean);
-    const allLocations = jobs.map(job => job.location).filter(Boolean);
-    const allCompanies = jobs.map(job => job.company).filter(Boolean);
-    
-    // Get unique values
-    const uniqueTitles = [...new Set(allTitles)];
-    const uniqueLocations = [...new Set(allLocations)];
-    const uniqueCompanies = [...new Set(allCompanies)];
-
-    // Find common job types and experience levels
-    const commonJobTypes = findCommonJobTypes(jobs);
-    const commonExperienceLevels = findCommonExperienceLevels(jobs);
-    const salaryRange = findSalaryRange(jobs);
-
-    return {
-      // Job title filters (all titles from the job list)
-      jobTitle: uniqueTitles,
+    if (agentFilters && Object.keys(agentFilters).length > 0) {
+      console.log('📤 Sending agent filters to parent:', agentFilters);
       
-      // Location filters
-      location: {
-        cities: uniqueLocations,
-        radius: 25,
-        remote: jobs.some(job => job.remote)
-      },
-      
-      // Company filters
-      companies: uniqueCompanies,
-      
-      // Job types
-      jobTypes: commonJobTypes,
-      
-      // Experience levels
-      experienceLevels: commonExperienceLevels,
-      
-      // Salary range
-      salaryRange: salaryRange,
-      
-      // Additional metadata
-      datePosted: "past_week",
-      workAuthorization: true,
-      source: 'chatbot',
-      jobsCount: jobs.length,
-      
-      // Metadata about the filter source
-      filterSource: {
-        type: 'chatbot_job_list',
-        jobCount: jobs.length,
-        timestamp: new Date().toISOString()
+      // Send agent's filter update to parent window
+      if (onSendResponse) {
+        onSendResponse('filter_update', undefined, { filters: agentFilters });
+        console.log('✅ Agent filters sent to parent successfully');
+      } else {
+        console.error('❌ onSendResponse is not defined!');
       }
-    };
-  };
-
-  // Helper function to find common job types
-  const findCommonJobTypes = (jobs: Job[]): string[] => {
-    const types = jobs.map(job => job.type).filter(Boolean);
-    if (types.length === 0) return ["Full-time", "Part-time", "Contract"];
-    
-    const typeCount: Record<string, number> = {};
-    types.forEach(type => {
-      typeCount[type!] = (typeCount[type!] || 0) + 1;
-    });
-    
-    return Object.keys(typeCount).sort((a, b) => typeCount[b] - typeCount[a]);
-  };
-
-  // Helper function to find common experience levels
-  const findCommonExperienceLevels = (jobs: Job[]): string[] => {
-    const levels = jobs.map(job => getExperienceLevelFromTitle(job.jobTitle));
-    const levelCount: Record<string, number> = {};
-    
-    levels.flat().forEach(level => {
-      levelCount[level] = (levelCount[level] || 0) + 1;
-    });
-    
-    const commonLevels = Object.keys(levelCount).sort((a, b) => levelCount[b] - levelCount[a]);
-    return commonLevels.length > 0 ? commonLevels : ["Entry Level", "Mid Level", "Senior Level"];
-  };
-
-  // Helper function to guess experience level from job title
-  const getExperienceLevelFromTitle = (title: string): string[] => {
-    const lowerTitle = title.toLowerCase();
-    if (lowerTitle.includes('senior') || lowerTitle.includes('sr.') || lowerTitle.includes('lead') || lowerTitle.includes('principal')) {
-      return ["Senior Level"];
-    } else if (lowerTitle.includes('mid') || lowerTitle.includes('experienced') || lowerTitle.includes('ii') || lowerTitle.includes('2')) {
-      return ["Mid Level"];
-    } else if (lowerTitle.includes('junior') || lowerTitle.includes('entry') || lowerTitle.includes('associate') || lowerTitle.includes('i') || lowerTitle.includes('1')) {
-      return ["Entry Level"];
+    } else {
+      console.warn('❌ No agent filters available to send');
+      
+      // Fallback: try to use filters from the last assistant message
+      const lastAssistantMessage = messages
+        .filter(msg => msg.role === 'assistant')
+        .pop();
+      
+      if (lastAssistantMessage?.filters) {
+        console.log('🔄 Using filters from last assistant message:', lastAssistantMessage.filters);
+        onSendResponse('filter_update', undefined, { filters: lastAssistantMessage.filters });
+      } else {
+        console.warn('❌ No fallback filters available');
+      }
     }
-    return ["Entry Level", "Mid Level", "Senior Level"];
-  };
-
-  // Helper function to find salary range from all jobs
-  const findSalaryRange = (jobs: Job[]): { min?: number; max?: number } => {
-    const salaries = jobs.map(job => extractSalaryFromText(job.salary)).filter(salary => salary.min || salary.max);
-    
-    if (salaries.length === 0) return {};
-    
-    const minSalaries = salaries.map(s => s.min).filter(Boolean) as number[];
-    const maxSalaries = salaries.map(s => s.max).filter(Boolean) as number[];
-    
-    return {
-      min: minSalaries.length > 0 ? Math.min(...minSalaries) : undefined,
-      max: maxSalaries.length > 0 ? Math.max(...maxSalaries) : undefined
-    };
-  };
-
-  // Helper function to extract salary from text
-  const extractSalaryFromText = (salaryText?: string): { min?: number; max?: number } => {
-    if (!salaryText) return {};
-    
-    const rangeMatch = salaryText.match(/\$([\d,]+)\.?\d*\s*-\s*\$([\d,]+)\.?\d*/);
-    if (rangeMatch) {
-      return {
-        min: parseInt(rangeMatch[1].replace(/,/g, '')),
-        max: parseInt(rangeMatch[2].replace(/,/g, ''))
-      };
-    }
-    
-    const singleMatch = salaryText.match(/\$([\d,]+)\.?\d*/);
-    if (singleMatch) {
-      const salary = parseInt(singleMatch[1].replace(/,/g, ''));
-      return {
-        min: salary * 0.8, // Estimate range
-        max: salary * 1.2
-      };
-    }
-    
-    return {};
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -245,14 +127,22 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
       // Parse the JSON response
       const responseData = await response.json();
       console.log('API Response received:', responseData);
+      console.log('🔍 Agent filters in response:', responseData.filters);
 
       let parsedContent: ParsedContent;
+      let agentFiltersFromResponse = responseData.filters || {};
+
+      // Store agent's filters if available
+      if (responseData.filters && Object.keys(responseData.filters).length > 0) {
+        setAgentFilters(responseData.filters);
+        console.log('💾 Stored agent filters:', responseData.filters);
+      }
 
       // Check if we have jobs in the response
       if (responseData.jobs && responseData.jobs.length > 0) {
         console.log('Jobs found in response:', responseData.jobs.length);
         
-        // Store current jobs for filter creation
+        // Store current jobs for filter creation (fallback)
         setCurrentJobs(responseData.jobs);
         
         // Convert the API jobs to match our parsing interface
@@ -287,11 +177,16 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
 
       console.log('Final parsed content:', parsedContent);
 
-      // Update the message with parsed content
+      // Update the message with parsed content AND store filters in the message
+      const updatedMessage: Message = { 
+        id: botMessageId, 
+        role: 'assistant', 
+        content: parsedContent,
+        filters: agentFiltersFromResponse // Store filters in the message
+      };
+
       setMessages(prev => prev.map(msg => 
-        msg.id === botMessageId 
-          ? { ...msg, content: parsedContent }
-          : msg
+        msg.id === botMessageId ? updatedMessage : msg
       ));
 
       // Save chat history
@@ -323,13 +218,14 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
           : msg
       ));
       setCurrentJobs([]);
+      setAgentFilters(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Fixed RenderMessageContent component with proper type handling
- const RenderMessageContent = ({ content }: { content: Message['content'] }) => {
+ const RenderMessageContent = ({ content, filters }: { content: Message['content'], filters?: any }) => {
   // Handle string content
   if (typeof content === 'string') {
     return <p className="whitespace-pre-wrap">{content}</p>;
@@ -340,6 +236,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
     switch (content.type) {
       case 'jobs':
         console.log('Rendering jobs:', content.data);
+        console.log('Available filters for this message:', filters);
         return (
           <div className="jobs-container">
             <div className="space-y-3">
@@ -348,22 +245,30 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
               ))}
             </div>
             
-            {/* Global Update Filters Button - Only show when there are jobs */}
-            {content.data.length > 0 && (
-              <div className="global-filters-button-container">
+            {/* Global Update Filters Button - Show when we have agent filters OR jobs */}
+            {(filters && Object.keys(filters).length > 0) || content.data.length > 0 ? (
+              <div className="global-filters-button-container mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <button 
-                  className="global-update-filters-btn"
+                  className="global-update-filters-btn flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                   onClick={handleUpdateAllFilters}
-                  title="Apply search criteria from all these jobs to your dashboard filters"
+                  title="Apply search criteria from agent's response to your dashboard filters"
                 >
                   <Filter size={16} />
-                  Update Dashboard Filters ({content.data.length} jobs)
+                  Update Dashboard Filters 
+                  {filters && Object.keys(filters).length > 0 ? ' (From Agent)' : ` (${content.data.length} jobs)`}
                 </button>
-                <div className="filter-help-text">
-                  This will update your main search with criteria from all the jobs above
+                <div className="filter-help-text text-sm text-blue-600 mt-1">
+                  {filters && Object.keys(filters).length > 0 
+                    ? "This will update your main search with the agent's recommended filters"
+                    : "This will update your main search with criteria from all the jobs above"}
+                </div>
+                
+                {/* Debug info - remove in production */}
+                <div className="debug-info text-xs text-gray-500 mt-2">
+                  Filters available: {filters ? Object.keys(filters).length : 0}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         );
       
@@ -393,7 +298,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
       <div className="multi-part-content">
         {content.data.map((part: ParsedContent, index: number) => (
           <div key={index}>
-            <RenderMessageContent content={part} />
+            <RenderMessageContent content={part} filters={filters} />
           </div>
         ))}
       </div>
@@ -443,7 +348,7 @@ function isMultiPartContent(content: any): content is MultiPartContent {
                       <span className="h-2 w-2 bg-gray-500 rounded-full animate-bounce"></span>
                     </div>
                   ) : (
-                    <RenderMessageContent content={msg.content} />
+                    <RenderMessageContent content={msg.content} filters={msg.filters} />
                   )}
                 </>
               )}
