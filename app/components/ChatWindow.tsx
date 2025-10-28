@@ -1,4 +1,4 @@
-// components/ChatWindow.tsx - FIXED VERSION WITH AGENT'S FILTERS
+// components/ChatWindow.tsx - FIXED VERSION WITH PROPER FILTER BUTTON VISIBILITY
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -245,8 +245,8 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
               ))}
             </div>
             
-            {/* Global Update Filters Button - Show when we have agent filters OR jobs */}
-            {(filters && Object.keys(filters).length > 0) || content.data.length > 0 ? (
+            {/* Global Update Filters Button - Show ONLY when we have agent filters */}
+            {filters && Object.keys(filters).length > 0 ? (
               <div className="global-filters-button-container mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <button 
                   className="global-update-filters-btn flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -254,13 +254,10 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
                   title="Apply search criteria from agent's response to your dashboard filters"
                 >
                   <Filter size={16} />
-                  Update Dashboard Filters 
-                  {filters && Object.keys(filters).length > 0 ? ' (From Agent)' : ` (${content.data.length} jobs)`}
+                  Update Dashboard Filters (From Agent)
                 </button>
                 <div className="filter-help-text text-sm text-blue-600 mt-1">
-                  {filters && Object.keys(filters).length > 0 
-                    ? "This will update your main search with the agent's recommended filters"
-                    : "This will update your main search with criteria from all the jobs above"}
+                  This will update your main search with the agent's recommended filters
                 </div>
                 
                 {/* Debug info - remove in production */}
