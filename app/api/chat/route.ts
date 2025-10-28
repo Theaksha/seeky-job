@@ -1,4 +1,4 @@
-// src/app/api/chat/route.ts - FIXED VERSION
+// src/app/api/chat/route.ts - FIXED VERSION WITH YAML, JSON, AND XML PARSING
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from '@aws-sdk/client-bedrock-agent-runtime';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { NextRequest } from 'next/server';
@@ -140,13 +140,13 @@ function extractJobsFromStructuredFormat(message: string) {
   let cleanMessage = message
     .replace(/<response>|<\/response>/g, '')
     .replace(/<update_dashboard>[\s\S]*?<\/update_dashboard>/g, '')
+    .replace(/update_dashboard:[\s\S]*?(?=\n\n|$)/g, '') // Remove YAML format filters
     .trim();
   
   console.log('🔍 Cleaned message for job extraction:', cleanMessage);
   
   // Pattern for numbered job listings with company and location
-  // Example: "1. IT Administrator at Diversified Systems Inc in Addison, TX"
-  const numberedPattern = /(\d+)\.\s+(.+?)\s+at\s+(.+?)\s+in\s+(.+?)(?:\n|\.|$)/g;
+  const numberedPattern = /(\d+)\.\s+\*\*([^*]+)\*\*\s*\n\s*-\s*Company:\s*([^\n]+)\s*\n\s*-\s*Location:\s*([^\n]+)/g;
   
   let match;
   while ((match = numberedPattern.exec(cleanMessage)) !== null) {
@@ -154,16 +154,11 @@ function extractJobsFromStructuredFormat(message: string) {
     const company = match[3].trim();
     const location = match[4].trim();
     
-    // Find the apply URL for this job (look for the next [Apply here] link after this job)
-    const jobSection = cleanMessage.substring(match.index);
-    const applyMatch = jobSection.match(/\[Apply here\]\((https?:\/\/[^)]+)\)/);
-    const applyUrl = applyMatch ? applyMatch[1] : '';
-    
     const job = {
       title: jobTitle,
       company: company,
       location: location,
-      applyUrl: applyUrl,
+      applyUrl: '',
       description: `${jobTitle} position at ${company} in ${location}`,
       type: 'Full-time',
       remote: location.toLowerCase().includes('remote') || jobTitle.toLowerCase().includes('remote')
@@ -175,26 +170,32 @@ function extractJobsFromStructuredFormat(message: string) {
       existingJob.title === job.title && existingJob.company === job.company
     );
     
-    if (!isDuplicate && jobTitle.toLowerCase() !== 'apply here') {
+    if (!isDuplicate) {
       jobs.push(job);
     }
   }
   
   // Pattern for markdown-style links with job types
-  const markdownPattern = /\[([^\]]+)\]\(([^)]+)\)\s*-\s*([^\n\r<]+)/g;
+  const markdownPattern = /\[([^\]]+)\]\(([^)]+)\)\s*(?:at\s+([^\n(]+))?\s*(?:\(([^)]+)\))?/g;
   
   while ((match = markdownPattern.exec(cleanMessage)) !== null) {
     const jobTitle = match[1].trim();
     const applyUrl = match[2].trim();
-    const jobType = match[3].trim();
+    const company = match[3] ? match[3].trim() : 'Unknown Company';
+    const jobDetails = match[4] ? match[4].trim() : '';
     
-    let company = 'Unknown Company';
-    if (applyUrl.includes('tietalent.com')) {
-      company = 'TieTalent';
-    } else if (applyUrl.includes('bestjobtool.com')) {
-      company = 'Best Job Tool';
-    } else if (applyUrl.includes('linkedin.com')) {
-      company = 'LinkedIn';
+    // Skip if it's clearly not a job link
+    if (jobTitle.toLowerCase().includes('apply here') || jobTitle.length < 3) {
+      continue;
+    }
+    
+    let jobType = 'Full-time';
+    if (jobDetails.includes('Part-time')) {
+      jobType = 'Part-time';
+    } else if (jobDetails.includes('Contract')) {
+      jobType = 'Contract';
+    } else if (jobDetails.includes('Temporary')) {
+      jobType = 'Temporary';
     }
     
     let location = 'United States';
@@ -209,7 +210,7 @@ function extractJobsFromStructuredFormat(message: string) {
       applyUrl: applyUrl,
       description: `${jobTitle} position at ${company}`,
       type: jobType,
-      remote: location.toLowerCase().includes('remote') || jobTitle.toLowerCase().includes('remote')
+      remote: jobTitle.toLowerCase().includes('remote') || location.toLowerCase().includes('remote')
     };
     
     console.log('💼 Extracted job from markdown:', job);
@@ -218,13 +219,174 @@ function extractJobsFromStructuredFormat(message: string) {
       existingJob.title === job.title && existingJob.applyUrl === job.applyUrl
     );
     
-    if (!isDuplicate && jobTitle.toLowerCase() !== 'apply here') {
+    if (!isDuplicate) {
       jobs.push(job);
     }
   }
   
   console.log(`🎯 Total jobs extracted: ${jobs.length}`);
   return jobs;
+}
+
+// Function to parse XML-like filter structure to JSON
+function parseXmlFiltersToJson(xmlContent: string): any {
+  const filters: any = {};
+  
+  console.log('🔄 Parsing XML content:', xmlContent);
+  
+  // Extract jobTitle
+  const jobTitleMatch = xmlContent.match(/<jobTitle>([^<]+)<\/jobTitle>/);
+  if (jobTitleMatch) {
+    console.log('📝 Found jobTitle:', jobTitleMatch[1]);
+    try {
+      filters.jobTitle = JSON.parse(jobTitleMatch[1]);
+    } catch (e) {
+      // If JSON parsing fails, extract the array content manually
+      const arrayMatch = jobTitleMatch[1].match(/\["([^"]+)"\]/);
+      if (arrayMatch) {
+        filters.jobTitle = [arrayMatch[1]];
+      } else {
+        filters.jobTitle = [jobTitleMatch[1].replace(/\[|\]|"/g, '').trim()];
+      }
+    }
+  }
+  
+  // Extract jobTypes
+  const jobTypesMatch = xmlContent.match(/<jobTypes>([^<]+)<\/jobTypes>/);
+  if (jobTypesMatch) {
+    console.log('📝 Found jobTypes:', jobTypesMatch[1]);
+    try {
+      filters.jobTypes = JSON.parse(jobTypesMatch[1]);
+    } catch (e) {
+      const arrayMatch = jobTypesMatch[1].match(/\["([^"]+)"\]/);
+      if (arrayMatch) {
+        filters.jobTypes = [arrayMatch[1]];
+      } else {
+        filters.jobTypes = [jobTypesMatch[1].replace(/\[|\]|"/g, '').trim()];
+      }
+    }
+  }
+  
+  // Extract location
+  const locationMatch = xmlContent.match(/<location>([\s\S]*?)<\/location>/);
+  if (locationMatch) {
+    console.log('📝 Found location:', locationMatch[1]);
+    filters.location = {};
+    
+    // Extract cities
+    const citiesMatch = locationMatch[1].match(/<cities>([^<]+)<\/cities>/);
+    if (citiesMatch) {
+      console.log('📝 Found cities:', citiesMatch[1]);
+      try {
+        filters.location.cities = JSON.parse(citiesMatch[1]);
+      } catch (e) {
+        const arrayMatch = citiesMatch[1].match(/\["([^"]+)"\]/);
+        if (arrayMatch) {
+          filters.location.cities = [arrayMatch[1]];
+        } else {
+          filters.location.cities = [citiesMatch[1].replace(/\[|\]|"/g, '').trim()];
+        }
+      }
+    }
+    
+    // Extract radius
+    const radiusMatch = locationMatch[1].match(/<radius>([^<]+)<\/radius>/);
+    if (radiusMatch) {
+      console.log('📝 Found radius:', radiusMatch[1]);
+      filters.location.radius = parseInt(radiusMatch[1]);
+    }
+  }
+  
+  // Extract experienceLevels
+  const experienceMatch = xmlContent.match(/<experienceLevels>([^<]+)<\/experienceLevels>/);
+  if (experienceMatch) {
+    console.log('📝 Found experienceLevels:', experienceMatch[1]);
+    try {
+      filters.experienceLevels = JSON.parse(experienceMatch[1]);
+    } catch (e) {
+      const arrayMatch = experienceMatch[1].match(/\["([^"]+)"\]/);
+      if (arrayMatch) {
+        filters.experienceLevels = [arrayMatch[1]];
+      } else {
+        filters.experienceLevels = [experienceMatch[1].replace(/\[|\]|"/g, '').trim()];
+      }
+    }
+  }
+  
+  console.log('✅ Parsed filters:', filters);
+  return filters;
+}
+
+// Function to parse YAML-like filter structure to JSON
+function parseYamlFiltersToJson(yamlContent: string): any {
+  const filters: any = {};
+  
+  console.log('🔄 Parsing YAML content:', yamlContent);
+  
+  // Extract jobTitle array
+  const jobTitleMatch = yamlContent.match(/jobTitle:\s*\[([^\]]+)\]/);
+  if (jobTitleMatch) {
+    console.log('📝 Found jobTitle:', jobTitleMatch[1]);
+    try {
+      // Try to parse as JSON array first
+      filters.jobTitle = JSON.parse(`[${jobTitleMatch[1]}]`);
+    } catch (e) {
+      // If JSON parsing fails, parse manually
+      const items = jobTitleMatch[1].split(',').map(item => 
+        item.trim().replace(/'/g, '').replace(/"/g, '')
+      );
+      filters.jobTitle = items;
+    }
+  }
+  
+  // Extract jobTypes array
+  const jobTypesMatch = yamlContent.match(/jobTypes:\s*\[([^\]]+)\]/);
+  if (jobTypesMatch) {
+    console.log('📝 Found jobTypes:', jobTypesMatch[1]);
+    try {
+      filters.jobTypes = JSON.parse(`[${jobTypesMatch[1]}]`);
+    } catch (e) {
+      const items = jobTypesMatch[1].split(',').map(item => 
+        item.trim().replace(/'/g, '').replace(/"/g, '')
+      );
+      filters.jobTypes = items;
+    }
+  }
+  
+  // Extract location object
+  const locationMatch = yamlContent.match(/location:\s*\n\s*cities:\s*\[([^\]]+)\]\s*\n\s*radius:\s*(\d+)/);
+  if (locationMatch) {
+    console.log('📝 Found location:', locationMatch[1], 'radius:', locationMatch[2]);
+    filters.location = {};
+    
+    try {
+      filters.location.cities = JSON.parse(`[${locationMatch[1]}]`);
+    } catch (e) {
+      const items = locationMatch[1].split(',').map(item => 
+        item.trim().replace(/'/g, '').replace(/"/g, '')
+      );
+      filters.location.cities = items;
+    }
+    
+    filters.location.radius = parseInt(locationMatch[2]);
+  }
+  
+  // Extract experienceLevels array
+  const experienceMatch = yamlContent.match(/experienceLevels:\s*\[([^\]]+)\]/);
+  if (experienceMatch) {
+    console.log('📝 Found experienceLevels:', experienceMatch[1]);
+    try {
+      filters.experienceLevels = JSON.parse(`[${experienceMatch[1]}]`);
+    } catch (e) {
+      const items = experienceMatch[1].split(',').map(item => 
+        item.trim().replace(/'/g, '').replace(/"/g, '')
+      );
+      filters.experienceLevels = items;
+    }
+  }
+  
+  console.log('✅ Parsed YAML filters:', filters);
+  return filters;
 }
 
 // Function to parse the agent response and ensure consistent format
@@ -276,12 +438,11 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
         console.log('✅ Successfully extracted filters from JSON structure:', finalFilters);
       }
     } catch (jsonError) {
-      console.log('❌ Could not parse as direct JSON, trying XML tag extraction...');
-      // If direct JSON parsing fails, try XML tag extraction
+      console.log('❌ Could not parse as direct JSON, trying other formats...');
     }
   }
 
-  // EXTRACT FILTERS FROM XML-LIKE TAGS IN THE MESSAGE TEXT (fallback)
+  // EXTRACT FILTERS FROM XML-LIKE TAGS IN THE MESSAGE TEXT
   if (Object.keys(finalFilters).length === 0 && messageText.includes('<update_dashboard>')) {
     console.log('🔍 Found update_dashboard tags in message text');
     try {
@@ -290,8 +451,21 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
         const dashboardContent = dashboardMatch[1].trim();
         console.log('📋 Extracted dashboard content:', dashboardContent);
         
-        finalFilters = JSON.parse(dashboardContent);
-        console.log('✅ Successfully parsed filters from XML tags:', finalFilters);
+        // Try to parse as JSON first (new agent format)
+        try {
+          const parsedJson = JSON.parse(dashboardContent);
+          if (parsedJson.filters) {
+            finalFilters = parsedJson.filters;
+            console.log('✅ Successfully parsed JSON filters from update_dashboard:', finalFilters);
+          } else {
+            finalFilters = parsedJson;
+            console.log('✅ Successfully parsed direct JSON filters from update_dashboard:', finalFilters);
+          }
+        } catch (jsonError) {
+          console.log('❌ JSON parsing failed, trying XML parsing...');
+          // If JSON fails, try XML parsing (old agent format)
+          finalFilters = parseXmlFiltersToJson(dashboardContent);
+        }
         
         finalMessageText = messageText.replace(/<update_dashboard>[\s\S]*?<\/update_dashboard>/, '').trim();
         finalMessageText = finalMessageText.replace(/<response>|<\/response>/g, '').trim();
@@ -300,6 +474,26 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
       console.error('❌ Error parsing dashboard filters from XML tags:', parseError);
     }
   } 
+  
+  // EXTRACT FILTERS FROM YAML FORMAT (new agent format)
+  if (Object.keys(finalFilters).length === 0 && messageText.includes('update_dashboard:')) {
+    console.log('🔍 Found YAML format update_dashboard in message text');
+    try {
+      const yamlMatch = messageText.match(/update_dashboard:\s*\n([\s\S]*?)(?=\n\n|$)/);
+      if (yamlMatch) {
+        const yamlContent = yamlMatch[1].trim();
+        console.log('📋 Extracted YAML content:', yamlContent);
+        
+        finalFilters = parseYamlFiltersToJson(yamlContent);
+        console.log('✅ Successfully parsed YAML filters:', finalFilters);
+        
+        finalMessageText = messageText.replace(/update_dashboard:[\s\S]*?(?=\n\n|$)/, '').trim();
+      }
+    } catch (parseError) {
+      console.error('❌ Error parsing dashboard filters from YAML format:', parseError);
+    }
+  }
+  
   // Also check if filters are in the response object directly (fallback)
   else if (Object.keys(finalFilters).length === 0 && responseObj.update_dashboard) {
     try {
