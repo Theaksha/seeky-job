@@ -1,9 +1,11 @@
+// components/Chatbot.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 import { ChatWindow } from './ChatWindow';
 import { ALLOWED_ORIGINS } from '../../config';
+import './Chatbot.css';
 
 export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,7 +15,7 @@ export function Chatbot() {
   // Function to send responses to parent window
   const sendResponseToParent = (response: string, userMessage?: string, userProfile?: any) => {
     if (parentOrigin) {
-      console.log('📤 Sending response to parent:', { response, userMessage, userProfile });
+      console.log('📤 Chatbot: Sending response to parent:', { response, userMessage, userProfile });
       
       window.parent.postMessage({
         type: 'CHATBOT_RESPONSE',
@@ -66,12 +68,20 @@ export function Chatbot() {
         setUserId(event.data.userId);
       }
 
+      // Handle user profile data
+      if (event.data && event.data.type === 'USER_PROFILE') {
+        console.log('Chatbot received user profile:', event.data.profile);
+        // Store user profile for personalized greeting
+        localStorage.setItem('userProfile', JSON.stringify(event.data.profile));
+      }
+
       // Handle logout message from parent
       if (event.data && event.data.type === 'USER_LOGOUT') {
         console.log('🔄 Chatbot received logout signal from parent');
         setUserId(null);
-        // Clear local storage session
+        // Clear local storage session and chat messages
         localStorage.removeItem('chatbotSessionId');
+        localStorage.removeItem('chatMessages');
         
         // Send confirmation back to parent
         if (parentOrigin) {
@@ -80,6 +90,12 @@ export function Chatbot() {
             timestamp: new Date().toISOString()
           }, parentOrigin);
         }
+      }
+
+      // Handle force close from parent (overlay click)
+      if (event.data && event.data.type === 'FORCE_CLOSE') {
+        console.log('🔄 Chatbot received force close signal from parent');
+        setIsOpen(false);
       }
     };
     window.addEventListener('message', handleMessage);
