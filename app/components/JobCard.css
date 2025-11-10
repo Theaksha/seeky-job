@@ -1,0 +1,31 @@
+/* Add to JobCard.css */
+.job-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 8px 0;
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.job-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e1;
+}
+
+.job-card.expanded {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.company-initials {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
