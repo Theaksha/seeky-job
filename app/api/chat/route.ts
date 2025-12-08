@@ -1,7 +1,9 @@
-// src/app/api/chat/route.ts - FIXED VERSION WITH PROPER JOB EXTRACTION
+// src/app/api/chat/route.ts - UPDATED VERSION WITH html-entities
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from '@aws-sdk/client-bedrock-agent-runtime';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { NextRequest } from 'next/server';
+import { decode } from 'html-entities';
+import * as yaml from 'js-yaml';
 
 // --- Environment Variables ---
 const {
@@ -36,6 +38,12 @@ const lambdaClient = new LambdaClient({
 const allowedOrigins = process.env.NEXT_PUBLIC_ALLOWED_ORIGINS 
   ? process.env.NEXT_PUBLIC_ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
   : ['http://localhost:3000'];
+
+// Function to decode HTML entities using html-entities library
+function decodeHtmlEntities(text: string): string {
+  if (!text) return '';
+  return decode(text);
+}
 
 // Function to determine user role from profile data
 function determineUserRole(profile: any): string {
@@ -562,8 +570,6 @@ function parseYamlFiltersToJson(yamlContent: string): any {
   return filters;
 }
 
-import * as yaml from 'js-yaml';
-
 // Function to normalize any agent response to consistent JSON format
 function normalizeAgentResponse(agentMessage: string | object): any {
   console.log('🔄 Normalizing agent response to JSON format');
@@ -615,29 +621,78 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
   console.log('=== PARSING AGENT RESPONSE ===');
   console.log('🔍 Raw agent message type:', typeof agentMessage);
   
-  // Normalize to JSON first
-  const responseObj = normalizeAgentResponse(agentMessage);
-  console.log('✅ Normalized to JSON:', JSON.stringify(responseObj, null, 2));
+  // Use agent response directly since it's already properly formatted
+  const responseObj = agentMessage;
+  console.log('✅ Using agent response directly:', JSON.stringify(responseObj, null, 2));
   
   let messageText = '';
   let filters = {};
   let jobs = [];
+  let finalFilters = {};
   
   console.log('🔍 Response object structure:', JSON.stringify(responseObj, null, 2));
 
   // Extract message text from response
   if (responseObj.response) {
-    messageText = responseObj.response;
+    messageText = decodeHtmlEntities(responseObj.response); // DECODE HERE
     console.log('📝 Raw response text:', messageText);
   } else if (typeof responseObj === 'string') {
-    messageText = responseObj;
+    messageText = decodeHtmlEntities(responseObj); // DECODE HERE
   } else {
     messageText = JSON.stringify(responseObj);
+  }
+  
+  // Extract jobs directly from response if available
+  if (responseObj.jobs && Array.isArray(responseObj.jobs)) {
+    jobs = responseObj.jobs.map((job: any, index: number) => {
+      // Format salary from object to string
+      let salaryString = '';
+      if (job.salary && typeof job.salary === 'object') {
+        const { min, max, rate } = job.salary;
+        if (min && max) {
+          salaryString = `$${min.toLocaleString()} - $${max.toLocaleString()}`;
+          if (rate) salaryString += ` per ${rate}`;
+        }
+      } else if (job.salary) {
+        salaryString = job.salary;
+      }
+      
+      // Clean and decode description HTML
+      let cleanDescription = job.description || '';
+      if (cleanDescription) {
+        cleanDescription = decodeHtmlEntities(cleanDescription) // DECODE HERE
+          .replace(/<[^>]*>/g, ' ')  // Remove HTML tags
+          .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+          .trim();
+      }
+      
+      return {
+        jobTitle: job.title || job.jobTitle || `Job ${index + 1}`,
+        company: job.company || '',
+        location: job.location || '',
+        description: cleanDescription,
+        salary: salaryString,
+        type: job.schedule_type || job.type || 'Full-time',
+        applyUrl: job.urls?.LinkedIn || job.applyUrl || '',
+        remote: job.remote || false,
+        postedAt: job.postedAt || '',
+        logo: job.thumbnail || '',
+        sector: job.sector || '',
+        experienceLevel: job.experience_level || '',
+        h1bSponsorship: job.h1b_sponsorship || false
+      };
+    });
+    console.log(`✅ Extracted ${jobs.length} jobs directly from response`);
+  }
+  
+  // Extract filters directly from response if available
+  if (responseObj.filters) {
+    finalFilters = responseObj.filters;
+    console.log('✅ Extracted filters directly from response:', finalFilters);
   }
 
   // CHECK FOR JSON STRUCTURE INSIDE RESPONSE TAGS
   let finalMessageText = messageText;
-  let finalFilters = {};
   
   console.log('🔍 Starting filter extraction from message:', messageText.substring(0, 200) + '...');
 
@@ -652,7 +707,7 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
         const parsedJson = JSON.parse(jsonContent);
         if (parsedJson.update_dashboard && parsedJson.update_dashboard.filters) {
           finalFilters = parsedJson.update_dashboard.filters;
-          finalMessageText = parsedJson.response || messageText;
+          finalMessageText = decodeHtmlEntities(parsedJson.response || messageText); // DECODE HERE
           console.log('✅ Successfully extracted filters from response tags:', finalFilters);
         }
       }
@@ -669,7 +724,7 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
       const parsedResponse = JSON.parse(messageText);
       if (parsedResponse.update_dashboard && parsedResponse.update_dashboard.filters) {
         finalFilters = parsedResponse.update_dashboard.filters;
-        finalMessageText = parsedResponse.response || messageText;
+        finalMessageText = decodeHtmlEntities(parsedResponse.response || messageText); // DECODE HERE
         console.log('✅ Successfully extracted filters from JSON structure:', finalFilters);
       }
     } catch (jsonError) {
@@ -704,6 +759,7 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
         
         finalMessageText = messageText.replace(/<update_dashboard>[\s\S]*?<\/update_dashboard>/, '').trim();
         finalMessageText = finalMessageText.replace(/<response>|<\/response>/g, '').trim();
+        finalMessageText = decodeHtmlEntities(finalMessageText); // DECODE HERE
       }
     } catch (parseError) {
       console.error('❌ Error parsing dashboard filters from XML tags:', parseError);
@@ -723,6 +779,7 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
         console.log('✅ Successfully parsed YAML filters:', finalFilters);
         
         finalMessageText = messageText.replace(/update_dashboard:[\s\S]*?(?=\n\n|$)/, '').trim();
+        finalMessageText = decodeHtmlEntities(finalMessageText); // DECODE HERE
       }
     } catch (parseError) {
       console.error('❌ Error parsing dashboard filters from YAML format:', parseError);
@@ -754,8 +811,8 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
     console.log('✅ Final filters extracted:', JSON.stringify(finalFilters, null, 2));
   }
 
-  // Extract job listings from the final message text
-  if (finalMessageText) {
+  // Only extract jobs from message text if we haven't already extracted them directly
+  if (jobs.length === 0 && finalMessageText) {
     console.log('📝 Processing message for jobs:', finalMessageText);
     jobs = extractJobsFromStructuredFormat(finalMessageText);
     console.log(`Extracted ${jobs.length} jobs from message`);
@@ -768,17 +825,21 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
     }
   }
 
-  // Convert jobs to consistent structure
+  // Convert jobs to consistent structure WITH DECODED HTML ENTITIES
   const structuredJobs = jobs.map((job: any, index: number) => ({
-    jobTitle: job.title || job.jobTitle || `Job ${index + 1}`,
-    company: job.company || '',
-    location: job.location || '',
-    description: job.description || '',
+    jobTitle: decodeHtmlEntities(job.title || job.jobTitle || `Job ${index + 1}`),
+    company: decodeHtmlEntities(job.company || ''),
+    location: decodeHtmlEntities(job.location || ''),
+    description: decodeHtmlEntities(job.description || ''), // DECODE HERE
     salary: job.salary,
-    type: job.type || 'Full-time',
-    applyUrl: job.applyUrl,
+    type: job.type || job.schedule_type || 'Full-time',
+    applyUrl: job.applyUrl || (job.urls && job.urls.LinkedIn) || '',
     remote: job.remote || false,
-    postedAt: job.postedAt || ''
+    postedAt: job.postedAt || '',
+    logo: job.thumbnail || job.logo || '',
+    sector: decodeHtmlEntities(job.sector || ''),
+    experienceLevel: job.experienceLevel || job.experience_level || '',
+    h1bSponsorship: job.h1bSponsorship || job.h1b_sponsorship || false
   }));
 
   return {
@@ -795,6 +856,12 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
 
 // Function to fix invalid JSON syntax in agent response
 function fixAgentResponseSyntax(responseText: string): any {
+  // Check if responseText is undefined or null
+  if (!responseText) {
+    console.error('Response text is undefined or null');
+    return { response: '' };
+  }
+  
   try {
     return JSON.parse(responseText);
   } catch (initialError) {
@@ -881,20 +948,10 @@ export async function POST(req: NextRequest) {
     console.log('User profile provided:', !!userProfile);
 
     const invokeParams = {
-      FunctionName: 'arn:aws:lambda:us-east-2:927701869872:function:seeky-bedrockagentfunc',
+      FunctionName: process.env.LAMBDA_PROXY_URL || 'arn:aws:lambda:us-east-2:927701869872:function:Weatherstrandspoc',
       Payload: JSON.stringify({ 
         prompt: message, 
-        sessionId: sessionId,
-        userId: roleBasedUserId,
-        userRole: finalUserRole,
-        userProfile: userProfile,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          role: finalUserRole,
-          origin: requestOrigin,
-          originalSessionId: sessionId,
-          originalUserId: roleBasedUserId
-        }
+        session_id: roleBasedUserId
       }),
     };
 
@@ -904,18 +961,54 @@ export async function POST(req: NextRequest) {
     if (lambdaResponse.FunctionError) {
       const errorPayloadString = lambdaResponse.Payload ? new TextDecoder().decode(lambdaResponse.Payload) : '{}';
       const errorPayload = JSON.parse(errorPayloadString);
+      
+      // Handle timeout specifically
+      if (errorPayload.errorType === 'Sandbox.Timedout') {
+        return new Response(JSON.stringify({
+          message: 'The request is taking longer than expected. Please try again with a simpler question.',
+          jobs: [],
+          filters: {},
+          sessionId: sessionId,
+          userId: roleBasedUserId,
+          userRole: finalUserRole,
+          timestamp: new Date().toISOString(),
+          responseType: 'timeout_error'
+        }), { 
+          status: 200,
+          headers 
+        });
+      }
+      
       throw new Error(`Lambda function returned an error: ${JSON.stringify(errorPayload)}`);
     }
 
     const payloadString = lambdaResponse.Payload ? new TextDecoder().decode(lambdaResponse.Payload) : '{}';
     const apiGatewayResponse = JSON.parse(payloadString);
     
+    // Handle double-encoded JSON from agent
     let agentResponse;
-    try {
-      agentResponse = fixAgentResponseSyntax(apiGatewayResponse.body);
-    } catch (parseError) {
-      console.error('Error parsing agent response:', parseError);
-      agentResponse = { message: apiGatewayResponse.body };
+    if (typeof apiGatewayResponse.body === 'string') {
+      try {
+        // Replace NaN values before parsing
+        const cleanedBody = apiGatewayResponse.body.replace(/: NaN/g, ': null');
+        agentResponse = JSON.parse(cleanedBody);
+      } catch (e) {
+        console.error('Failed to parse agent response:', e);
+        agentResponse = { response: apiGatewayResponse.body };
+      }
+    } else {
+      agentResponse = apiGatewayResponse.body || apiGatewayResponse;
+    }
+    
+    // If agentResponse is still a string, parse it again
+    if (typeof agentResponse === 'string') {
+      try {
+        const cleanedResponse = agentResponse.replace(/: NaN/g, ': null');
+        agentResponse = JSON.parse(cleanedResponse);
+      } catch (e) {
+        console.error('Failed to parse nested JSON:', e);
+        agentResponse = { response: agentResponse };
+      }
     }
 
     console.log('Agent response structure:', {
@@ -926,9 +1019,8 @@ export async function POST(req: NextRequest) {
       fullResponse: JSON.stringify(agentResponse, null, 2)
     });
 
-    // Normalize agent response to JSON format before parsing
-    const normalizedResponse = normalizeAgentResponse(agentResponse);
-    const parsedData = parseAgentResponse(normalizedResponse, sessionId, finalUserRole, roleBasedUserId);
+    // Use agent response directly without normalization
+    const parsedData = parseAgentResponse(agentResponse, sessionId, finalUserRole, roleBasedUserId);
     
     console.log('Final parsed data ready');
     console.log('Jobs found:', parsedData.jobs.length);
