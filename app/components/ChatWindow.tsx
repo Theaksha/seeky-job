@@ -283,17 +283,20 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
         
         // Convert the API jobs to match our JobCard interface
         const jobsForParsing = responseData.jobs.map((job: any) => ({
-          jobTitle: job.jobTitle || job.title || 'No title',
-          company: job.company || 'Unknown company',
-          location: job.location || 'Location not specified',
-          description: job.description || `Position at ${job.company || 'a company'}`,
-          salary: job.salary,
-          type: job.type || 'Full-time',
-          applyUrl: job.applyUrl,
-          remote: job.remote || false,
-          sector: job.sector || 'IT Services and IT Consulting',
-          postedAt: job.postedAt || '18 hours ago'
-        }));
+    jobTitle: job.jobTitle || job.title || job.jobTitle || 'No title',
+    company: job.company || 'Unknown company',
+    location: job.location || 'Location not specified',
+    description: job.description || `Position at ${job.company || 'a company'}`,
+    salary: job.salary,
+    type: job.type || job.schedule_type || 'Full-time',
+    applyUrl: job.applyUrl || (job.urls && job.urls.LinkedIn) || '',
+    remote: job.remote || false,
+    sector: job.sector || 'IT Services and IT Consulting',
+    postedAt: job.postedAt || '18 hours ago',
+    logo: job.thumbnail || job.logo || '', // This is the key fix!
+    experienceLevel: job.experienceLevel || job.experience_level || '',
+    h1bSponsorship: job.h1bSponsorship || job.h1b_sponsorship || false
+  }));
         
         parsedContent = {
           type: 'jobs',
@@ -350,25 +353,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
         msg.id === botMessageId ? updatedMessage : msg
       ));
 
-      // Save chat history
-      const saveChatHistory = async () => {
-        const saveChatPayload = {
-          session_id: sessionId,
-          user_id: requestUserId,
-          user_input: messageToSend,
-          agent_response: JSON.stringify(responseData),
-        };
-        try {
-          await fetch('/api/save-chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(saveChatPayload),
-          });
-        } catch (error) {
-          console.error('Failed to save chat history:', error);
-        }
-      };
-      saveChatHistory();
+
 
     } catch (error) {
       console.error('Fetch error:', error);
