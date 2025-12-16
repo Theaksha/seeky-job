@@ -39,14 +39,14 @@
 
 .job-description-html a,
 .job-description-html .job-description-link {
-  color: #2563eb !important; /* Blue color for links */
+  color: #2563eb !important;
   text-decoration: underline !important;
   font-weight: 500;
 }
 
 .job-description-html a:hover,
 .job-description-html .job-description-link:hover {
-  color: #1d4ed8 !important; /* Darker blue on hover */
+  color: #1d4ed8 !important;
   text-decoration: underline !important;
 }
 
@@ -65,6 +65,8 @@
   color: #111827;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.25rem;
 }
 
 .job-description-h4 {
@@ -95,6 +97,7 @@
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
   color: #374151;
+  line-height: 1.6;
 }
 
 .job-description-p a {
@@ -102,23 +105,30 @@
   text-decoration: underline !important;
 }
 
-.job-description-ul {
+/* Ensure proper line breaks */
+.job-description-html br,
+.job-description-br {
+  display: block;
+  content: "";
+  margin-top: 0.5rem;
+}
+
+/* Proper spacing for lists */
+.job-description-ul,
+.job-description-ol {
   list-style-type: disc;
   padding-left: 1.25rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin: 0.75rem 0;
 }
 
 .job-description-ol {
   list-style-type: decimal;
-  padding-left: 1.25rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
 }
 
 .job-description-li {
   color: #374151;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
 }
 
 .job-description-li a {
@@ -129,6 +139,9 @@
 .job-description-div {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
 }
 
 .job-description-span {
@@ -140,6 +153,7 @@
   border-collapse: collapse;
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
+  background: white;
 }
 
 .job-description-tr {
@@ -149,6 +163,7 @@
 .job-description-td {
   padding: 0.5rem 0.75rem;
   color: #374151;
+  border: 1px solid #e5e7eb;
 }
 
 .job-description-td a {
@@ -162,12 +177,7 @@
   font-weight: 600;
   color: #111827;
   background-color: #f9fafb;
-}
-
-.job-description-br {
-  margin-bottom: 0.25rem;
-  display: block;
-  content: "";
+  border: 1px solid #e5e7eb;
 }
 
 /* Specific link styling */
@@ -175,6 +185,7 @@
   color: #2563eb !important;
   text-decoration: underline !important;
   font-weight: 500;
+  word-break: break-all;
 }
 
 .job-description-link:hover {
@@ -219,4 +230,108 @@
 .job-card a[href*="linkedin"]:hover,
 .job-card a[href*="jobs"]:hover {
   color: #1d4ed8 !important;
+}
+
+/* Better table styling */
+.job-description-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  background: white;
+}
+
+.job-description-th,
+.job-description-td {
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.job-description-th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+/* Ensure links are visible */
+.job-description-link {
+  color: #2563eb !important;
+  text-decoration: underline !important;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.job-description-link:hover {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
+
+/* Proper spacing for strong/em text */
+.job-description-strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+.job-description-em {
+  font-style: italic;
+  color: #4b5563;
+}
+
+/* Add to JobCard.css */
+
+/* Cursor indication for clickable cards */
+.clickable-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-card:hover {
+  background-color: #f8fafc;
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+/* Make sure links in description don't trigger card click */
+.job-description-link {
+  pointer-events: auto !important;
+}
+
+/* Disable pointer events for description area when expanded */
+.job-card.expanded .job-description-html {
+  pointer-events: auto;
+}
+
+/* Make toggle button stand out more */
+.job-card button {
+  pointer-events: auto;
+  z-index: 1;
+  position: relative;
+}
+
+/* Apply button styling */
+.job-card button.bg-blue-600 {
+  pointer-events: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .job-description-html {
+    font-size: 0.875rem;
+  }
+  
+  .job-description-h3 {
+    font-size: 1.125rem;
+  }
+  
+  .job-description-h4 {
+    font-size: 1rem;
+  }
+  
+  .job-description-table {
+    font-size: 0.875rem;
+  }
+  
+  .job-description-th,
+  .job-description-td {
+    padding: 0.5rem;
+  }
 }
