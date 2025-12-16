@@ -201,7 +201,7 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
               
               {/* Global Update Filters Button - Show ONLY when we have agent filters */}
               {filters && Object.keys(filters).length > 0 ? (
-                <div className="global-filters-button-container mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="global-filters-button-container mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
                   <button 
                     className="global-update-filters-btn flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                     onClick={(e) => {
@@ -211,11 +211,9 @@ export function ChatWindow({ userId, onSendResponse, onSendError }: ChatWindowPr
                     title="Apply search criteria from agent's response to your dashboard filters"
                   >
                     <Filter size={16} />
-                    Update Dashboard Filters (From Agent)
+                    Update Dashboard Filters 
                   </button>
-                  <div className="filter-help-text text-sm text-blue-600 mt-1">
-                    This will update your main search with the agent's recommended filters
-                  </div>
+                  
                 </div>
               ) : null}
             </div>
