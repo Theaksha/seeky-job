@@ -1,7 +1,7 @@
-// components/JobCard.tsx - COMPLETE VERSION WITH HTML ENTITY DECODING
+// components/JobCard.tsx - FIXED CLICK BEHAVIOR
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, memo, useCallback } from 'react';
 import { ExternalLink, MapPin, Briefcase, DollarSign, Calendar } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import './JobCard.css';
@@ -27,163 +27,271 @@ interface JobCardProps {
   job: Job;
 }
 
-// Helper function to decode HTML entities
+// Enhanced HTML entity decoder
 const decodeHtmlEntities = (text: string): string => {
   if (!text) return '';
   
-  // Create a textarea element to decode HTML entities
-  const textArea = document.createElement('textarea');
-  textArea.innerHTML = text;
-  const decoded = textArea.value;
+  // Common HTML entities mapping
+  const entityMap: { [key: string]: string } = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#x27;': "'",
+    '&#x2F;': '/',
+    '&#x60;': '`',
+    '&#x3D;': '=',
+    '&#x2019;': "'",  // Right single quotation mark
+    '&#x2018;': "'",  // Left single quotation mark  
+    '&#x201c;': '"',  // Left double quotation mark
+    '&#x201d;': '"',  // Right double quotation mark
+    '&#x2013;': '-',  // En dash
+    '&#x2014;': '--', // Em dash
+    '&#x2026;': '...', // Horizontal ellipsis
+    '&#8217;': "'",   // Right single quotation mark (alternative)
+    '&#8216;': "'",   // Left single quotation mark (alternative)
+    '&#8220;': '"',   // Left double quotation mark (alternative)
+    '&#8221;': '"',   // Right double quotation mark (alternative)
+    '&#8211;': '-',   // En dash (alternative)
+    '&#8212;': '--',  // Em dash (alternative)
+    '&#8230;': '...', // Horizontal ellipsis (alternative)
+    '&#038;': '&',    // Ampersand (alternative)
+    '&apos;': "'",    // Apostrophe
+  };
+
+  let decoded = text;
   
-  // Clean up
+  // First: decode numeric decimal entities (&#123;)
+  decoded = decoded.replace(/&#(\d+);/g, (match, dec) => {
+    return String.fromCharCode(parseInt(dec, 10));
+  });
+  
+  // Second: decode hex entities (&#x1F4A9;)
+  decoded = decoded.replace(/&#x([0-9a-f]+);/gi, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+  
+  // Third: decode named entities
+  Object.keys(entityMap).forEach(entity => {
+    const regex = new RegExp(entity, 'g');
+    decoded = decoded.replace(regex, entityMap[entity]);
+  });
+  
+  // Fourth: use browser's decoder for any remaining entities
+  const textArea = document.createElement('textarea');
+  textArea.innerHTML = decoded;
+  const finalResult = textArea.value;
   textArea.remove();
   
-  return decoded;
+  return finalResult;
 };
- // Add this function to convert plain URLs to clickable links
+
 const convertUrlsToLinks = (html: string): string => {
   if (!html) return '';
-  
-  // Regex to match URLs
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  
   return html.replace(urlRegex, (url) => {
     return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="job-description-link">${url}</a>`;
   });
 };
 
-// Helper function to format and clean HTML description
 const formatDescription = (html: string) => {
   if (!html) return '';
   
-  // First decode HTML entities
+  // Decode HTML entities first
   let cleaned = decodeHtmlEntities(html);
   
-  // Convert plain URLs to clickable links
-  cleaned = convertUrlsToLinks(cleaned);  // Clean up common issues
+  // Convert URLs to links
+  cleaned = convertUrlsToLinks(cleaned);
+  
+  // Handle line breaks
   cleaned = cleaned
-    .replace(/^\s+|\s+$/g, '') // Trim whitespace
-    .replace(/\n\s*\n/g, '\n\n') // Normalize line breaks
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim();
-    
-
-  // Add CSS classes to HTML elements for better styling
-  cleaned = cleaned
-    .replace(/<strong>/gi, '<strong class="job-description-strong">')
-    .replace(/<\/strong>/gi, '</strong>')
-    .replace(/<b>/gi, '<strong class="job-description-strong">')
-    .replace(/<\/b>/gi, '</strong>')
-    .replace(/<em>/gi, '<em class="job-description-em">')
-    .replace(/<\/em>/gi, '</em>')
-    .replace(/<i>/gi, '<em class="job-description-em">')
-    .replace(/<\/i>/gi, '</em>')
-    .replace(/<h1>/gi, '<h3 class="job-description-h3">')
-    .replace(/<\/h1>/gi, '</h3>')
-    .replace(/<h2>/gi, '<h3 class="job-description-h3">')
-    .replace(/<\/h2>/gi, '</h3>')
-    .replace(/<h3>/gi, '<h4 class="job-description-h4">')
-    .replace(/<\/h3>/gi, '</h4>')
-    .replace(/<h4>/gi, '<h4 class="job-description-h4">')
-    .replace(/<\/h4>/gi, '</h4>')
-    .replace(/<h5>/gi, '<h5 class="job-description-h5">')
-    .replace(/<\/h5>/gi, '</h5>')
-    .replace(/<h6>/gi, '<h6 class="job-description-h6">')
-    .replace(/<\/h6>/gi, '</h6>')
-    .replace(/<ul>/gi, '<ul class="job-description-ul">')
-    .replace(/<\/ul>/gi, '</ul>')
-    .replace(/<ol>/gi, '<ol class="job-description-ol">')
-    .replace(/<\/ol>/gi, '</ol>')
-    .replace(/<li>/gi, '<li class="job-description-li">')
-    .replace(/<\/li>/gi, '</li>')
-    .replace(/<p>/gi, '<p class="job-description-p">')
-    .replace(/<\/p>/gi, '</p>')
-    .replace(/<div>/gi, '<div class="job-description-div">')
-    .replace(/<\/div>/gi, '</div>')
     .replace(/<br\s*\/?>/gi, '<br class="job-description-br">')
-    .replace(/<br>/gi, '<br class="job-description-br">')
-    .replace(/<span>/gi, '<span class="job-description-span">')
-    .replace(/<\/span>/gi, '</span>')
-    .replace(/<table>/gi, '<table class="job-description-table">')
-    .replace(/<\/table>/gi, '</table>')
-    .replace(/<tr>/gi, '<tr class="job-description-tr">')
-    .replace(/<\/tr>/gi, '</tr>')
-    .replace(/<td>/gi, '<td class="job-description-td">')
-    .replace(/<\/td>/gi, '</td>')
-    .replace(/<th>/gi, '<th class="job-description-th">')
-    .replace(/<\/th>/gi, '</th>')
-    .replace(/<a\s+href="([^"]*)"[^>]*>/gi, '<a href="$1" target="_blank" rel="noopener noreferrer" class="job-description-link">')
-    .replace(/<\/a>/gi, '</a>');
+    .replace(/<br>/gi, '<br class="job-description-br">');
+
+  // Clean up whitespace but preserve paragraph breaks
+  cleaned = cleaned
+    .replace(/^\s+|\s+$/g, '')
+    .replace(/\n\s*\n/g, '\n\n')
+    .trim();
+
+  // Cache replacement patterns for HTML tags with CSS classes
+  const replacements = [
+    [/<strong>/gi, '<strong class="job-description-strong">'],
+    [/<\/strong>/gi, '</strong>'],
+    [/<b>/gi, '<strong class="job-description-strong">'],
+    [/<\/b>/gi, '</strong>'],
+    [/<em>/gi, '<em class="job-description-em">'],
+    [/<\/em>/gi, '</em>'],
+    [/<i>/gi, '<em class="job-description-em">'],
+    [/<\/i>/gi, '</em>'],
+    [/<h1>/gi, '<h3 class="job-description-h3">'],
+    [/<\/h1>/gi, '</h3>'],
+    [/<h2>/gi, '<h3 class="job-description-h3">'],
+    [/<\/h2>/gi, '</h3>'],
+    [/<h3>/gi, '<h4 class="job-description-h4">'],
+    [/<\/h3>/gi, '</h4>'],
+    [/<h4>/gi, '<h4 class="job-description-h4">'],
+    [/<\/h4>/gi, '</h4>'],
+    [/<h5>/gi, '<h5 class="job-description-h5">'],
+    [/<\/h5>/gi, '</h5>'],
+    [/<h6>/gi, '<h6 class="job-description-h6">'],
+    [/<\/h6>/gi, '</h6>'],
+    [/<ul>/gi, '<ul class="job-description-ul">'],
+    [/<\/ul>/gi, '</ul>'],
+    [/<ol>/gi, '<ol class="job-description-ol">'],
+    [/<\/ol>/gi, '</ol>'],
+    [/<li>/gi, '<li class="job-description-li">'],
+    [/<\/li>/gi, '</li>'],
+    [/<p>/gi, '<p class="job-description-p">'],
+    [/<\/p>/gi, '</p>'],
+    [/<div>/gi, '<div class="job-description-div">'],
+    [/<\/div>/gi, '</div>'],
+    [/<span>/gi, '<span class="job-description-span">'],
+    [/<\/span>/gi, '</span>'],
+    [/<table>/gi, '<table class="job-description-table">'],
+    [/<\/table>/gi, '</table>'],
+    [/<tr>/gi, '<tr class="job-description-tr">'],
+    [/<\/tr>/gi, '</tr>'],
+    [/<td>/gi, '<td class="job-description-td">'],
+    [/<\/td>/gi, '</td>'],
+    [/<th>/gi, '<th class="job-description-th">'],
+    [/<\/th>/gi, '</th>'],
+    [/<a\s+href="([^"]*)"[^>]*>/gi, '<a href="$1" target="_blank" rel="noopener noreferrer" class="job-description-link">'],
+    [/<\/a>/gi, '</a>']
+  ];
+
+  replacements.forEach(([pattern, replacement]) => {
+    cleaned = cleaned.replace(pattern as RegExp, replacement as string);
+  });
 
   return cleaned;
 };
 
-// Helper function to truncate HTML content
 const truncateHtml = (html: string, maxLength: number = 300): string => {
   if (!html) return '';
   
-  // Create a temporary div to get text content
+  // Create a temporary div to parse HTML and extract text
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
   
-  // Get plain text for length calculation
+  // Get plain text content
   const plainText = tempDiv.textContent || tempDiv.innerText || '';
   
   if (plainText.length <= maxLength) {
     return html;
   }
   
-  // Truncate and add "More" indicator
+  // Truncate and add "Read more" indicator
   const truncatedText = plainText.substring(0, maxLength) + '...';
-  
   return `<p class="job-description-p">${truncatedText} <span class="text-blue-600 font-medium">(Click "More" to see full description)</span></p>`;
 };
 
-export function JobCard({ job }: JobCardProps) {
+const getCompanyInitials = (companyName: string) => {
+  if (!companyName) return '??';
+  return companyName
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+const JobCardComponent = ({ job }: JobCardProps) => {
   const [showDetail, setShowDetail] = useState(false);
   
-  // Clean the description before processing
-  const cleanedDescription = job.description 
-    ? decodeHtmlEntities(job.description)
-    : '';
+  // Handle card click - open apply URL
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
+    // Don't trigger if clicking on the toggle button or within the expanded details
+    const target = e.target as HTMLElement;
     
-  const formattedDescription = formatDescription(cleanedDescription);
-  
-  const sanitizedDescription = DOMPurify.sanitize(formattedDescription, {
-    ALLOWED_TAGS: [
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'b', 'i', 
-      'ul', 'ol', 'li', 'div', 'span', 'table', 'tr', 'td', 'th', 'a'
-    ],
-    ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
-  });
-  
-  const displayDescription = showDetail 
-    ? sanitizedDescription 
-    : truncateHtml(sanitizedDescription, 300);
+    // Check if click is on the toggle button or its children
+    if (
+      target.closest('button') || 
+      target.closest('.job-description-html') ||
+      target.closest('.animate-in') ||
+      target.closest('.job-description-link')
+    ) {
+      return; // Let the button or link handle its own click
+    }
+    
+    // Only open apply URL if it exists
+    if (job.applyUrl) {
+      window.open(job.applyUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, [job.applyUrl]);
 
-  const getWorkArrangement = () => {
+  // Handle toggle button click - expand/collapse description
+  const handleToggleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click from firing
+    setShowDetail(prev => !prev);
+  }, []);
+
+  // Handle apply button click
+  const handleApplyClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click from firing
+    if (job.applyUrl) {
+      window.open(job.applyUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, [job.applyUrl]);
+
+  // Process job description with proper HTML entity decoding
+  const displayDescription = React.useMemo(() => {
+    if (!job.description) return '';
+    
+    // Clean and decode the description
+    const cleanedDescription = decodeHtmlEntities(job.description);
+    
+    // Format with proper HTML tags and CSS classes
+    const formattedDescription = formatDescription(cleanedDescription);
+    
+    // Sanitize for security
+    const sanitizedDescription = DOMPurify.sanitize(formattedDescription, {
+      ALLOWED_TAGS: [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'b', 'i', 
+        'ul', 'ol', 'li', 'div', 'span', 'table', 'tr', 'td', 'th', 'a'
+      ],
+      ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
+    });
+    
+    // Return truncated or full description based on state
+    return showDetail ? sanitizedDescription : truncateHtml(sanitizedDescription, 300);
+  }, [job.description, showDetail]);
+
+  const workArrangement = React.useMemo(() => {
     if (job.remote && job.type) {
       return `${job.type} • Remote`;
     }
     return job.type || 'Full-time';
-  };
+  }, [job.remote, job.type]);
 
-  const getPostedTime = () => {
+  const postedTime = React.useMemo(() => {
     return job.postedAt || '18 hours ago';
-  };
+  }, [job.postedAt]);
 
-  const getCompanyInitials = (companyName: string) => {
-    return companyName
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const companyInitials = React.useMemo(() => {
+    return getCompanyInitials(job.company);
+  }, [job.company]);
+
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    target.style.display = 'none';
+    const parent = target.parentElement;
+    if (parent) {
+      const initialsSpan = document.createElement('span');
+      initialsSpan.className = 'company-initials';
+      initialsSpan.textContent = companyInitials;
+      parent.appendChild(initialsSpan);
+    }
+  }, [companyInitials]);
 
   return (
-    <div className={`job-card cursor-pointer ${showDetail ? 'expanded' : ''}`} onClick={() => setShowDetail(!showDetail)}>
+    <div 
+      className={`job-card cursor-pointer ${showDetail ? 'expanded' : ''} ${job.applyUrl ? 'clickable-card' : ''}`}
+      onClick={handleCardClick}
+      title={job.applyUrl ? "Click to apply for this job" : "No apply link available"}
+    >
       <div className="flex items-start gap-4">
         {/* Company Logo */}
         <div className="flex-shrink-0 w-14 h-14 rounded-md bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 flex items-center justify-center overflow-hidden">
@@ -192,22 +300,12 @@ export function JobCard({ job }: JobCardProps) {
               src={job.logo} 
               alt={job.company} 
               className="w-full h-full object-contain p-1"
-              onError={(e) => {
-                // Fallback to initials if image fails to load
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const initialsSpan = document.createElement('span');
-                  initialsSpan.className = 'company-initials';
-                  initialsSpan.textContent = getCompanyInitials(job.company);
-                  parent.appendChild(initialsSpan);
-                }
-              }}
+              onError={handleImageError}
+              loading="lazy"
             />
           ) : (
             <span className="company-initials">
-              {getCompanyInitials(job.company)}
+              {companyInitials}
             </span>
           )}
         </div>
@@ -220,7 +318,7 @@ export function JobCard({ job }: JobCardProps) {
             <span>•</span>
             <span className="flex items-center gap-1">
               <Calendar size={12} />
-              {getPostedTime()}
+              {postedTime}
             </span>
           </div>  
 
@@ -242,7 +340,7 @@ export function JobCard({ job }: JobCardProps) {
             </div>
             <div className="flex items-center gap-1">
               <Briefcase size={14} className="text-gray-500" />
-              <span>{getWorkArrangement()}</span>
+              <span>{workArrangement}</span>
             </div>
             {job.salary && (
               <div className="flex items-center gap-1">
@@ -253,9 +351,13 @@ export function JobCard({ job }: JobCardProps) {
           </div>
         </div>
 
-        {/* Toggle Button */}
+        {/* Toggle Button - ONLY for expanding/collapsing description */}
         <div className="flex-shrink-0 self-center">
-          <button className="text-blue-600 text-sm font-medium hover:underline px-2 py-1 rounded hover:bg-blue-50 transition-colors">
+          <button 
+            className="text-blue-600 text-sm font-medium hover:underline px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+            onClick={handleToggleClick}
+            title={showDetail ? "Show less description" : "Show full description"}
+          >
             {showDetail ? 'Less' : 'More'}
           </button>
         </div>
@@ -263,7 +365,10 @@ export function JobCard({ job }: JobCardProps) {
 
       {/* Expandable Details */}
       {showDetail && (
-        <div className="mt-4 pt-4 border-t border-gray-200 animate-in slide-in-from-top duration-300">
+        <div 
+          className="mt-4 pt-4 border-t border-gray-200 animate-in slide-in-from-top duration-300"
+          onClick={(e) => e.stopPropagation()} // Prevent card click when clicking in details
+        >
           <div className="space-y-4">
             {/* Description */}
             <div>
@@ -290,7 +395,7 @@ export function JobCard({ job }: JobCardProps) {
                 <Briefcase size={16} className="text-blue-600" />
                 <div>
                   <span className="font-medium text-gray-700">Type:</span>
-                    <span className="ml-1 text-gray-600">{getWorkArrangement()}</span>
+                  <span className="ml-1 text-gray-600">{workArrangement}</span>
                 </div>
               </div>
               
@@ -318,19 +423,16 @@ export function JobCard({ job }: JobCardProps) {
               )}
             </div>
             
-            {/* Apply Button */}
+            {/* Apply Button (secondary way to apply) */}
             {job.applyUrl && (
               <div className="pt-2">
-                <a
-                  href={job.applyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={handleApplyClick}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 w-fit font-medium"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <ExternalLink size={16} />
                   Apply Now
-                </a>
+                </button>
               </div>
             )}
           </div>
@@ -338,4 +440,27 @@ export function JobCard({ job }: JobCardProps) {
       )}
     </div>
   );
-}
+};
+
+// Custom comparison function for memo
+const arePropsEqual = (prevProps: JobCardProps, nextProps: JobCardProps) => {
+  // Compare all relevant properties
+  return (
+    prevProps.job.jobTitle === nextProps.job.jobTitle &&
+    prevProps.job.company === nextProps.job.company &&
+    prevProps.job.location === nextProps.job.location &&
+    prevProps.job.description === nextProps.job.description &&
+    prevProps.job.salary === nextProps.job.salary &&
+    prevProps.job.type === nextProps.job.type &&
+    prevProps.job.applyUrl === nextProps.job.applyUrl &&
+    prevProps.job.remote === nextProps.job.remote &&
+    prevProps.job.sector === nextProps.job.sector &&
+    prevProps.job.postedAt === nextProps.job.postedAt &&
+    prevProps.job.logo === nextProps.job.logo &&
+    prevProps.job.experienceLevel === nextProps.job.experienceLevel &&
+    prevProps.job.h1bSponsorship === nextProps.job.h1bSponsorship
+  );
+};
+
+// Export memoized component with custom comparison
+export const JobCard = memo(JobCardComponent, arePropsEqual);
