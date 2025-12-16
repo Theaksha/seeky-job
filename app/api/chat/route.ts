@@ -826,13 +826,69 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
   }
 
   // Convert jobs to consistent structure WITH DECODED HTML ENTITIES
-  const structuredJobs = jobs.map((job: any, index: number) => ({
+  // In the parseAgentResponse function in route.ts, update the job cleaning section:
+
+// Convert jobs to consistent structure WITH DECODED HTML ENTITIES
+const structuredJobs = jobs.map((job: any, index: number) => {
+  // Clean and decode description HTML
+  let cleanDescription = job.description || '';
+  if (cleanDescription) {
+    // First replace the common HTML entities
+    cleanDescription = cleanDescription
+      .replace(/&#x2019;/g, "'")
+      .replace(/&#x2018;/g, "'")
+      .replace(/&#x201c;/g, '"')
+      .replace(/&#x201d;/g, '"')
+      .replace(/&#x2013;/g, "-")
+      .replace(/&#x2014;/g, "--")
+      .replace(/&#x2026;/g, "...")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+    
+    // Then decode remaining HTML entities
+    cleanDescription = decodeHtmlEntities(cleanDescription);
+    
+    // Remove script tags and other potentially dangerous content
+    cleanDescription = cleanDescription
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/on\w+="[^"]*"/gi, '') // Remove inline event handlers
+      .replace(/on\w+='[^']*'/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/data:/gi, '')
+      .trim();
+  }
+
+  // Format salary from object to string
+  let salaryString = '';
+  if (job.salary && typeof job.salary === 'object') {
+    const { min, max, rate } = job.salary;
+    if (min !== null && max !== null) {
+      if (rate === 'hour') {
+        salaryString = `$${min} - $${max}/hour`;
+      } else if (rate === 'year') {
+        const minFormatted = min.toLocaleString();
+        const maxFormatted = max.toLocaleString();
+        salaryString = `$${minFormatted} - $${maxFormatted}/year`;
+      } else {
+        salaryString = `$${min} - $${max}`;
+      }
+    }
+  } else if (job.salary) {
+    salaryString = job.salary;
+  }
+
+  return {
     jobTitle: decodeHtmlEntities(job.title || job.jobTitle || `Job ${index + 1}`),
     company: decodeHtmlEntities(job.company || ''),
     location: decodeHtmlEntities(job.location || ''),
-    description: decodeHtmlEntities(job.description || ''), // DECODE HERE
-    salary: job.salary,
-    type: job.type || job.schedule_type || 'Full-time',
+    description: cleanDescription,
+    salary: salaryString,
+    type: job.schedule_type || job.type || 'Full-time',
     applyUrl: job.applyUrl || (job.urls && job.urls.LinkedIn) || '',
     remote: job.remote || false,
     postedAt: job.postedAt || '',
@@ -840,7 +896,8 @@ function parseAgentResponse(agentMessage: string | object, sessionId: string, us
     sector: decodeHtmlEntities(job.sector || ''),
     experienceLevel: job.experienceLevel || job.experience_level || '',
     h1bSponsorship: job.h1bSponsorship || job.h1b_sponsorship || false
-  }));
+  };
+});
 
   return {
     message: finalMessageText,
